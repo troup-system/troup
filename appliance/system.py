@@ -13,7 +13,11 @@ class SystemStats:
     """
 
     def __init__(self):
-        pass
+        self.cpu = {'usage': 0.0, 'processors': 1, 'bogomips': 1}
+        self.memory = {'total': 1, 'used': 1, 'free': 1}
+        self.system = {'load': [0.0, 0.0, 0.0], 'name': ''}
+        self.disk = {'ioload': 0.0}
+                
 
 
 if __name__ == '__main__':
