@@ -15,9 +15,10 @@ class Channel:
     CLOSED = 'CLOSED'
     ERROR = 'ERROR'
     
-    def __init__(self, name):
+    def __init__(self, name, to_url):
         self.name = name
         self.status = 'CREATED'
+        self.listeners = []
         
     def open(self):
         if self.status is not Channel.CREATED:
@@ -46,6 +47,16 @@ class Channel:
         
     def disconnect(self):
         pass
+    
+    def register_listener(self, callback):
+        listener = self.__wrap_listener__(self, callback)
+        self.listeners.append(listener)
+    
+    def __wrap_listener__(self, callback):
+        return ListenerWrapper(callback)
+    
+    def send(self, data):
+        pass
 
 
 class ListenerWrapper:
@@ -63,34 +74,4 @@ class ListenerWrapper:
     
     def on_data(self, data):
         self.delegate(data)
-
-class InboundChannel(Channel):
-    
-    def __init__(self, name, to_url):
-        super(InboundChannel, self).__init__(name)
-        self.listeners = []
-    
-    def register_listener(self, callback):
-        listener = self.__wrap_listener__(self, callback)
-        self.listeners.append(listener)
-    
-    def __wrap_listener__(self, callback):
-        return ListenerWrapper(callback)
-    
-
-class OutboundChannel(Channel):
-    
-    def __init__(self, name, to_url):
-        super(OutboundChannel, self).__init__(name)
-    
-    def send(self, data):
-        pass
-
-class FullDuplexChannel(InboundChannel, OutboundChannel):
-    
-    def __init__(self, name, to_url):
-        super(FullDuplexChannel, self).__init__(name, to_url)
-
-
-
 
