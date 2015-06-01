@@ -76,7 +76,8 @@ class ListenerWrapper:
         self.delegate(data)
 
 
-from ws4py.websocket import WebSocket
+#from ws4py.websocket import WebSocket
+from ws4py.async_websocket import WebSocket
 from threading import Event
 
 class IncommingChannel(Channel):
@@ -102,10 +103,14 @@ class IncommingChannel(Channel):
 
 class IncomingChannelWSAdapter(WebSocket):
     
-    def __init__(self, sock, protocols=None, extensions=None, \
-        environ=None, heartbeat_freq=None)
-        super(IncomingChannelWSAdapter, self).__init__(sock=sock, protocols=protocols,\
-        extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
+#    def __init__(self, sock, protocols=None, extensions=None, \
+#        environ=None, heartbeat_freq=None)
+#        super(IncomingChannelWSAdapter, self).__init__(sock=sock, protocols=protocols,\
+#        extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
+    def __init__(self, protocol):
+        super(IncomingChannelWSAdapter, this).__init__(protocol)
+        self.server = self.protocol.server
+        
         self.channel = None
     
     def opened(self):
@@ -120,6 +125,32 @@ class IncomingChannelWSAdapter(WebSocket):
     
     def received_message(self, message):
         self.channel.on_data(message.data)
+    
+
+import asyncio
+
+class AsyncIOWebSocketServer:
+    
+    def __init__(self, host='', port=1700, webSocketClass=IncomingChannelWSAdapter):
+        self.host = host
+        self.port = port
+        self.webSocketClass = webSocketClass
+        self.aioLoop = asyncio.get_event_loop()
+        self.running = False
+        self.channels = {}
+        
+    def start(self):
+        pass
+        
+    def stop(self):
+        pass
+        
+    def on_channel_open(self, channel):
+        pass
+        
+    def on_channel_closed(self, channel):
+        pass
+    
     
 
 
