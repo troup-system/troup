@@ -6,4 +6,5 @@ Requirements
 ============
 
  * psutil
- 
+ * ws4py 
+ * tornado 

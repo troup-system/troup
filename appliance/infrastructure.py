@@ -75,3 +75,51 @@ class ListenerWrapper:
     def on_data(self, data):
         self.delegate(data)
 
+
+from ws4py.websocket import WebSocket
+from threading import Event
+
+class IncommingChannel(Channel):
+    
+    def __init__(self, name, to_url, adapter=None):
+        super(IncommingChannel, self).__init__(name, to_url)
+        self.adapter = adapter
+        self.close_event = Event()
+    
+    def disconnect(self):
+        self.adapter.close(code=1000, reason="client-closing")
+        // TODO: Wait to actually close
+        self.close_event.wait()
+    
+    def notify_close(self):
+        self.close_event.set()
+    
+    def send(self, data):
+        if self.status is Channel.OPEN:
+            self.adapter.send(payload=data)
+        else:
+            raise ChannelError('Not open')
+
+class IncomingChannelWSAdapter(WebSocket):
+    
+    def __init__(self, sock, protocols=None, extensions=None, \
+        environ=None, heartbeat_freq=None)
+        super(IncomingChannelWSAdapter, self).__init__(sock=sock, protocols=protocols,\
+        extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
+        self.channel = None
+    
+    def opened(self):
+        self.channel = IncommingChannel(\
+            name="channel[%s-%s]"%(self.sock.getsockname(),self.sock.getpeername()),\
+            to_url=self.sock.getpeername(),\
+            adapter=self)
+        self.channel.open()
+    
+    def closed(self, code, reason=None):
+        self.channel.notify_close()
+    
+    def received_message(self, message):
+        self.channel.on_data(message.data)
+    
+
+
