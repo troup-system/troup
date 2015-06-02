@@ -89,7 +89,7 @@ class IncommingChannel(Channel):
     
     def disconnect(self):
         self.adapter.close(code=1000, reason="client-closing")
-        // TODO: Wait to actually close
+        # TODO: Wait to actually close
         self.close_event.wait()
     
     def notify_close(self):
@@ -108,20 +108,26 @@ class IncomingChannelWSAdapter(WebSocket):
 #        super(IncomingChannelWSAdapter, self).__init__(sock=sock, protocols=protocols,\
 #        extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
     def __init__(self, protocol):
-        super(IncomingChannelWSAdapter, this).__init__(protocol)
-        self.server = self.protocol.server
+        print('Adapter starts... Protcol: %s' % str(protocol) )
+        #super(IncomingChannelWSAdapter, self).__init__(protocol)
+        WebSocket.__init__(self, protocol)
+        self.server = None 
         
         self.channel = None
+        print('Adapter started')
     
     def opened(self):
+        self.server = self.proto.server
         self.channel = IncommingChannel(\
             name="channel[%s-%s]"%(self.sock.getsockname(),self.sock.getpeername()),\
             to_url=self.sock.getpeername(),\
             adapter=self)
+            
         self.channel.open()
         self.server.on_channel_open(self.channel)
     
     def closed(self, code, reason=None):
+        print('colosing ws. code=%s, reason=%s'%(str(code),str(reason)))
         self.channel.notify_close()
         self.server.on_channel_closed(self.channel)
     
@@ -149,19 +155,21 @@ class AsyncIOWebSocketServer:
         self.aio_loop = asyncio.get_event_loop()
         self.running = False
         self.channels = {}
-        self.server_future = self.aioLoop.create_server(\
-            lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self),\
-            self.host,\
-            self.port)
         
     def start(self):
-        self.aio_loop.run_until_complete(self.server_future)
+        proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
+        sf = self.aio_loop.create_server( proto, self.host, self.port)
+        s = self.aio_loop.run_until_complete(sf)
+        print('stared on %s' %str(s.sockets[0].getsockname()))
+        self.aio_loop.run_forever()
         
     def stop(self):
         self.aio_loop.stop()
         
     def on_channel_open(self, channel):
         self.channels[channel.name] = channel
+        print('Channel %s added' % channel)
+    
     def on_channel_closed(self, channel):
         del self.channels[name]
     
