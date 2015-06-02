@@ -119,37 +119,51 @@ class IncomingChannelWSAdapter(WebSocket):
             to_url=self.sock.getpeername(),\
             adapter=self)
         self.channel.open()
+        self.server.on_channel_open(self.channel)
     
     def closed(self, code, reason=None):
         self.channel.notify_close()
+        self.server.on_channel_closed(self.channel)
     
     def received_message(self, message):
         self.channel.on_data(message.data)
     
 
+from ws4py.server.tulipserver import WebSocketProtocol
+
+class ServerAwareWebSocketProtocol (WebSocketProtocol):
+
+    def __init__(self, handler_class, server):
+        super(ServerAwareWebSocketProtocol, self).__init__(handler_class)
+        self.server = server
+
+
 import asyncio
 
 class AsyncIOWebSocketServer:
     
-    def __init__(self, host='', port=1700, webSocketClass=IncomingChannelWSAdapter):
+    def __init__(self, host='', port=1700, web_socket_class=IncomingChannelWSAdapter):
         self.host = host
         self.port = port
-        self.webSocketClass = webSocketClass
-        self.aioLoop = asyncio.get_event_loop()
+        self.web_socket_class = web_socket_class
+        self.aio_loop = asyncio.get_event_loop()
         self.running = False
         self.channels = {}
+        self.server_future = self.aioLoop.create_server(\
+            lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self),\
+            self.host,\
+            self.port)
         
     def start(self):
-        pass
+        self.aio_loop.run_until_complete(self.server_future)
         
     def stop(self):
-        pass
+        self.aio_loop.stop()
         
     def on_channel_open(self, channel):
-        pass
-        
+        self.channels[channel.name] = channel
     def on_channel_closed(self, channel):
-        pass
+        del self.channels[name]
     
     
 
