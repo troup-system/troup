@@ -1,10 +1,14 @@
+import logging
+
 __author__ = 'pavle'
 
 from types import FunctionType
 from types import MethodType
 
+
 class ChannelError(Exception):
     pass
+
 
 class Channel:
     
@@ -58,14 +62,21 @@ class Channel:
     def send(self, data):
         pass
 
+    def data_received(self, data):
+        for listener in self.listeners:
+            try:
+                listener.on_data(data)
+            except Exception as e:
+                logging.warning('Listener error: ', e)
+
 
 class ListenerWrapper:
     def __init__(self, delegate):
         self.delegate = self.__get_callable__(delegate)
     
     def __get_callable__(self, delegate):
-        if isinstance(delegate, types.FunctionType) or \
-           isinstance(delegate, types.MethodType):
+        if isinstance(delegate, FunctionType) or \
+           isinstance(delegate, MethodType):
             return delegate
         else:
             if hasattr(delegate, 'on_data'):
@@ -79,6 +90,7 @@ class ListenerWrapper:
 #from ws4py.websocket import WebSocket
 from ws4py.async_websocket import WebSocket
 from threading import Event
+
 
 class IncommingChannel(Channel):
     
@@ -101,6 +113,7 @@ class IncommingChannel(Channel):
         else:
             raise ChannelError('Not open')
 
+
 class IncomingChannelWSAdapter(WebSocket):
     
 #    def __init__(self, sock, protocols=None, extensions=None, \
@@ -118,24 +131,54 @@ class IncomingChannelWSAdapter(WebSocket):
     
     def opened(self):
         self.server = self.proto.server
-        self.channel = IncommingChannel(\
-            name="channel[%s-%s]"%(self.sock.getsockname(),self.sock.getpeername()),\
-            to_url=self.sock.getpeername(),\
-            adapter=self)
-            
-        self.channel.open()
-        self.server.on_channel_open(self.channel)
+        try:
+            self.channel = IncommingChannel(
+                name="channel[%s-%s]" % (self.local_address, self.peer_address),
+                to_url=str(self.peer_address),
+                adapter=self)
+            self.channel.open()
+            self.server.on_channel_open(self.channel)
+        except Exception as e:
+            logging.exception(e)
+            raise e
     
     def closed(self, code, reason=None):
-        print('colosing ws. code=%s, reason=%s'%(str(code),str(reason)))
+        print('closing ws. code=%s, reason=%s'%(str(code),str(reason)))
         self.channel.notify_close()
         self.server.on_channel_closed(self.channel)
     
     def received_message(self, message):
-        self.channel.on_data(message.data)
+        print(' -> %s' % str(message))
+        try:
+            self.channel.data_received(message.data)
+        except Exception as e:
+            logging.exception(e)
+
+    @property
+    def local_address(self):
+        """
+        Local endpoint address as a tuple
+        """
+        if not self._local_address:
+            self._local_address = self.proto.reader._transport.get_extra_info('sockname')
+            if len(self._local_address) == 4:
+                self._local_address = self._local_address[:2]
+        return self._local_address
+
+    @property
+    def peer_address(self):
+        """
+        Peer endpoint address as a tuple
+        """
+        if not self._peer_address:
+            self._peer_address = self.proto.reader._transport.get_extra_info('peername')
+            if len(self._peer_address) == 4:
+                self._peer_address = self._peer_address[:2]
+        return self._peer_address
     
 
 from ws4py.server.tulipserver import WebSocketProtocol
+
 
 class ServerAwareWebSocketProtocol (WebSocketProtocol):
 
@@ -145,6 +188,7 @@ class ServerAwareWebSocketProtocol (WebSocketProtocol):
 
 
 import asyncio
+
 
 class AsyncIOWebSocketServer:
     
@@ -158,9 +202,9 @@ class AsyncIOWebSocketServer:
         
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
-        sf = self.aio_loop.create_server( proto, self.host, self.port)
+        sf = self.aio_loop.create_server(proto, self.host, self.port)
         s = self.aio_loop.run_until_complete(sf)
-        print('stared on %s' %str(s.sockets[0].getsockname()))
+        print('stared on %s' % str(s.sockets[0].getsockname()))
         self.aio_loop.run_forever()
         
     def stop(self):
@@ -168,10 +212,10 @@ class AsyncIOWebSocketServer:
         
     def on_channel_open(self, channel):
         self.channels[channel.name] = channel
-        print('Channel %s added' % channel)
+        print('Channel %s => %s added' % (channel.name, channel))
     
     def on_channel_closed(self, channel):
-        del self.channels[name]
+        del self.channels[channel]
     
     
 
