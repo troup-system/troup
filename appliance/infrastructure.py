@@ -218,5 +218,54 @@ class AsyncIOWebSocketServer:
         del self.channels[channel]
     
     
+# -- outgoing connection
 
+from ws4py.client.threadedclient import WebSocketClient
+
+
+class OutgoingChannelWSAdapter(WebSocketClient):
+    
+    def __init__(self, url, handlers):
+        super(OutgoingChannelWSAdapter, self).__init__(url=url)
+        self.handlers = handlers
+    
+    def __noop__(self, *args, **kwargs):
+        pass
+    
+    def __handler__(self, name):
+        return self.handlers.get(name) or self.__noop__
+    
+    def opened(self):
+        self.__handler__('opened')()
+    
+    def closed(self, code, reason=None)
+        self.__handler__('closed')(code, reason)
+    
+    def received_message(self, m):
+        if m and m.data:
+            self.__handler__('on_data')(m.data)
+
+
+class OutgoingChannelOverWS(Channel):
+    
+    def __init__(self, name, to_url):
+        super(OutgoingChannel, self).__init__(name, to_url)
+        self.web_socket = OutgoingChannelWSAdapter(url=to_url,
+           handlers={
+                'opened': self.on_opened,
+                'closed': self.on_closed,
+                'on_data': self.data_received
+           })
+    
+    def on_opened(self):
+        pass
+    
+    def on_closed(self, code, reason=None):
+        pass
+    
+    def connect(self):
+        self.web_socket.connect()
+    
+    def disconnect(self):
+        self.web_socket.close()
 
