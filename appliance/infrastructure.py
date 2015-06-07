@@ -23,6 +23,7 @@ class Channel:
         self.name = name
         self.status = 'CREATED'
         self.listeners = []
+        self.event_listeners = {}
         
     def open(self):
         if self.status is not Channel.CREATED:
@@ -68,7 +69,22 @@ class Channel:
                 listener.on_data(data)
             except Exception as e:
                 logging.warning('Listener error: ', e)
-
+    
+    def on(self, event_name, callback):
+        callbacks = self.event_listeners.get(event_name)
+        if not callbacks:
+            callbacks = self.event_listeners[event_name] = []
+        if not callback in callbacks:
+            callbacks.append(callback)
+    
+    def trigger(self, event, *data):
+        callbacks = self.event_listeners.get(event_name)
+        if callbacks:
+            for callback in callbacks:
+                try:
+                    callback(*data)
+                except Exception as e:
+                    logging.debug('An error while triggering event {}', event, e)
 
 class ListenerWrapper:
     def __init__(self, delegate):
@@ -268,4 +284,24 @@ class OutgoingChannelOverWS(Channel):
     
     def disconnect(self):
         self.web_socket.close()
+
+
+class ChannelManager:
+    
+    def __init__(self, config):
+        self.config = config
+        self.channels = {}
+        self.log = logging.get_logger('channel-manager')
+        
+    def channel(self, name=None, to_url=None):
+        pass
+    
+    
+    def listen(self, name=None, to_url=None, listener=None):
+        pass
+    
+    def send(self, name=None, to_url=None, data=None):
+        pass
+    
+    
 
