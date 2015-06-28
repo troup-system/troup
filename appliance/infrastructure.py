@@ -254,7 +254,7 @@ class OutgoingChannelWSAdapter(WebSocketClient):
     def opened(self):
         self.__handler__('opened')()
     
-    def closed(self, code, reason=None)
+    def closed(self, code, reason=None):
         self.__handler__('closed')(code, reason)
     
     def received_message(self, m):
@@ -265,7 +265,7 @@ class OutgoingChannelWSAdapter(WebSocketClient):
 class OutgoingChannelOverWS(Channel):
     
     def __init__(self, name, to_url):
-        super(OutgoingChannel, self).__init__(name, to_url)
+        super(OutgoingChannelOverWS, self).__init__(name, to_url)
         self.web_socket = OutgoingChannelWSAdapter(url=to_url,
            handlers={
                 'opened': self.on_opened,
@@ -303,5 +303,50 @@ class ChannelManager:
     def send(self, name=None, to_url=None, data=None):
         pass
     
+
+
+
+# -- simlest message bus in the world
+
+class MessageBus:
     
+    def __init__(self):
+        self.subscribers = {}
+    
+    def on(self, topic, handler):
+        if not handler:
+            raise Exception('Handler not specified')
+        if not topic:
+            raise Exception('Topic not specified')
+        subscribers = self.__get_subscribers__(topic)
+        if handler in subscribers:
+            raise Exception('Handler already registered')
+        subscribers.append(handler)
+    
+    def __get_subscribers__(self, topic):
+        subscribers = self.subscribers.get(topic)
+        if not subscribers:
+            subscribers = []
+            self.subscribers[topic] = subscribers
+        return subscribers
+    
+    def publish(self, topic, event):
+        subscribers = self.subscribers.get(topic)
+        if subscribers:
+            for handler in subscribers:
+                try:
+                    handler(event)
+                except Exception as e:
+                    print('Woops')
+    
+    
+    def remove(self, topic, handler):
+        subscribers = self.subscribers.get(topic):
+        if subscribers:
+            subscribers.remove(handler)
+    
+    
+
+
+
 
