@@ -341,7 +341,7 @@ class MessageBus:
     
     
     def remove(self, topic, handler):
-        subscribers = self.subscribers.get(topic):
+        subscribers = self.subscribers.get(topic)
         if subscribers:
             subscribers.remove(handler)
     
