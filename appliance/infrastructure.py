@@ -215,6 +215,7 @@ class AsyncIOWebSocketServer:
         self.aio_loop = asyncio.get_event_loop()
         self.running = False
         self.channels = {}
+        self.listeners = []
         
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
@@ -233,6 +234,12 @@ class AsyncIOWebSocketServer:
     def on_channel_closed(self, channel):
         del self.channels[channel]
     
+    def on_event(self, callback):
+        self.listeners.append(callback)
+    
+    def notify_event(self, event, channel):
+        for listener in listeners:
+            listener(event, channel)
     
 # -- outgoing connection
 
@@ -288,14 +295,20 @@ class OutgoingChannelOverWS(Channel):
 
 class ChannelManager:
     
-    def __init__(self, config):
+    def __init__(self, config, aio_server):
         self.config = config
+        self.aio_server = aio_server
         self.channels = {}
         self.log = logging.get_logger('channel-manager')
         
     def channel(self, name=None, to_url=None):
-        pass
-    
+        if self.channels.get(name):
+            return self.channels[name]
+        if not to_url:
+            raise Exception('No channel URL specified')
+        channel = self.open_channel_to(to_url)
+        self.channels[name] = channel
+        return channel
     
     def listen(self, name=None, to_url=None, listener=None):
         pass
