@@ -275,13 +275,21 @@ class OutgoingChannelOverWS(Channel):
         super(OutgoingChannelOverWS, self).__init__(name, to_url)
         self.web_socket = OutgoingChannelWSAdapter(url=to_url,
            handlers={
-                'opened': self.on_opened,
-                'closed': self.on_closed,
+                'opened': self._on_open_handler_,
+                'closed': self._on_closed_handler_,
                 'on_data': self.data_received
            })
     
+    def _on_open_handler_(self):
+        self.trigger('open', self)
+        self.on_opened()
+    
     def on_opened(self):
         pass
+    
+    def _on_closed_handler_(self, code, reason=None):
+        self.trigger('closed', self, code, reason)
+        self.on_closed(code, reason)
     
     def on_closed(self, code, reason=None):
         pass
@@ -306,9 +314,17 @@ class ChannelManager:
             return self.channels[name]
         if not to_url:
             raise Exception('No channel URL specified')
-        channel = self.open_channel_to(to_url)
+        channel = self.open_channel_to(name, to_url)
         self.channels[name] = channel
         return channel
+    
+    def open_channel_to(self, url):
+        och = OutgoingChannelOverWS(name=name, to_url=url)
+        och.on('closed', self._handle_closed_channel_)
+        return och
+    
+    def _handle_closed_channel_(self, channel, code, reason=None):
+        del self.channels[channel.name]
     
     def listen(self, name=None, to_url=None, listener=None):
         pass
