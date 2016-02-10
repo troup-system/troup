@@ -6,6 +6,7 @@ def configure_node_parser():
     
     # Node
     parser.add_argument('--node', help='Node ID')
+    parser.add_argument('--neighbours', default='', nargs='+', help='Neighbour nodes')
     
     # Async IO server props
     parser.add_argument('--host', default='', help='Async IO server hostname')
