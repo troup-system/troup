@@ -132,13 +132,8 @@ class IncommingChannel(Channel):
 
 class IncomingChannelWSAdapter(WebSocket):
     
-#    def __init__(self, sock, protocols=None, extensions=None, \
-#        environ=None, heartbeat_freq=None)
-#        super(IncomingChannelWSAdapter, self).__init__(sock=sock, protocols=protocols,\
-#        extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
     def __init__(self, protocol):
         print('Adapter starts... Protcol: %s' % str(protocol) )
-        #super(IncomingChannelWSAdapter, self).__init__(protocol)
         WebSocket.__init__(self, protocol)
         self.server = None 
         
@@ -307,7 +302,7 @@ class ChannelManager:
         #self.config = config
         self.aio_server = aio_server
         self.channels = {}
-        self.log = logging.get_logger('channel-manager')
+        self.log = logging.getLogger('channel-manager')
         
     def channel(self, name=None, to_url=None):
         if self.channels.get(name):

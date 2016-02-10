@@ -57,7 +57,7 @@ class InMemorySyncedStore(Store):
 
     def __check_storage_file__(self, f_path):
         if not self.__exists_and_is_file__(f_path):
-            with open(self.__to_path__(f_path)) as file:
+            with open(self.__to_path__(f_path), 'w') as file:
                 file.write('{}')
 
     def __exists_and_is_file__(self, path):
