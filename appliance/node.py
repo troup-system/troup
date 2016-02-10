@@ -1,14 +1,29 @@
 __author__ = 'pavle'
 
+from appliance.store import InMemorySyncedStore
+from appliance.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager
+
+
 
 class Node:
 
     def __init__(self, node_id, config):
         self.node_id = node_id
         self.config = config
-
+        self.store = self._build_store_()
+        self.channel_manager = None
+    
+    def _start_channel_manager_(self):
+        aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
+        aio_srv.start()
+        channel_manager = ChannelManager(aio_srv)
+    
+    def _build_store_(self):
+        store = InMemorySyncedStore(root_path=self.config['store']['path'])
+        return store
+    
     def get_available_apps(self):
-        pass
+        return [app.name for app in self.store.apps]
 
     def get_stats(self):
         pass
@@ -17,7 +32,7 @@ class Node:
         pass
 
     def start(self):
-        pass
+        self.channel_manager = self._start_channel_manager_()
 
     def stop(self):
         pass

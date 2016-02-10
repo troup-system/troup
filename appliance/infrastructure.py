@@ -303,8 +303,8 @@ class OutgoingChannelOverWS(Channel):
 
 class ChannelManager:
     
-    def __init__(self, config, aio_server):
-        self.config = config
+    def __init__(self, aio_server):
+        #self.config = config
         self.aio_server = aio_server
         self.channels = {}
         self.log = logging.get_logger('channel-manager')
@@ -327,10 +327,12 @@ class ChannelManager:
         del self.channels[channel.name]
     
     def listen(self, name=None, to_url=None, listener=None):
-        pass
+        channel = self.channel(name, to_url)
+        channel.register_listener(listener)
     
     def send(self, name=None, to_url=None, data=None):
-        pass
+        channel = self.channel(name, to_url)
+        channel.send(data)
     
 
 
