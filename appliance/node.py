@@ -32,12 +32,19 @@ class Node:
 
     def get_stats(self):
         pass
-
+    
+    def get_apps(self):
+        pass
+        
+    def query(self, q):
+        pass
+    
     def run_app(self, app_name):
         pass
 
     def start(self):
         self.channel_manager = self._start_channel_manager_()
+        print('Node %s started' % self.node_id)
 
     def stop(self):
         pass
@@ -53,3 +60,11 @@ class Node:
 
     def sync_with_all(self):
         pass
+      
+        
+class SyncManager:
+    
+    def __init__(self, channel_manager):
+        self.channel_manager = channel_manager
+        self.known_nodes = []
+    

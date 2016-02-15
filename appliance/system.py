@@ -1,5 +1,9 @@
 __author__ = 'pavle'
 
+import psuti
+import os
+import threading
+
 
 class SystemStats:
     """
@@ -18,6 +22,23 @@ class SystemStats:
         self.system = {'load': [0.0, 0.0, 0.0], 'name': ''}
         self.disk = {'ioload': 0.0}
                 
+
+class StatsTracker:
+
+    def __init__(self, period=1000):
+        self.period = period
+        self.cpu_usage = []
+        self.cpu_usage_avg = psutil.cpu_percent()/100
+        self.cpu_count = psutil.cpu_count()
+        
+        
+    
+    def refresh_values(self):
+        cpu_usage = psutil.cpu_percent(interval=self.period/1000,percpu=True)
+        self.cpu_usage = [usage/100 for usage in cpu_usage]
+    
+    
+
 
 
 if __name__ == '__main__':
