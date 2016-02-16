@@ -1,4 +1,4 @@
-import threading
+from threading import Timer
 
 class IntervalTimer:
     
@@ -17,7 +17,7 @@ class IntervalTimer:
         if self.first:
             interval = interval + self.offset
             self.first = False
-        self.timer = threading.Timer(interval/1000, self._run_)
+        self.timer = Timer(interval/1000, self._run_)
         
         
     def cancel(self):
