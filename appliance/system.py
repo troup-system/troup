@@ -2,6 +2,7 @@ __author__ = 'pavle'
 
 import psutil
 import os
+import platform
 
 from appliance.threading import IntervalTimer
 
@@ -35,7 +36,7 @@ class SystemStats:
 
     def __init__(self):
         self.cpu = {'usage': 0.0, "per_cpu": [], 'processors': 0, 'bogomips': 0}
-        self.memory = {'total': 0, 'used': 0, 'free': 0}
+        self.memory = {'total': 0, 'used': 0, 'available': 0}
         self.system = {'load': [0.0, 0.0, 0.0], 'name': '', 'platform': ''}
         self.disk = {'ioload': 0.0}
                 
@@ -47,20 +48,55 @@ class StatsTracker:
         self.cpu_usage = []
         self.cpu_usage_avg = psutil.cpu_percent()/100
         self.cpu_count = psutil.cpu_count()
+        self.hostname = platform.node()
+        self.platform = platform.system()
         self.periodic_update = IntervalTimer(interval=self.period, target=self.refresh_values)
         self.periodic_update.start()
     
     def refresh_values(self):
         cpu_usage = psutil.cpu_percent(interval=self.period/1000,percpu=True)
+        print('cpu_usage=%s'%cpu_usage)
         self.cpu_usage = [usage/100 for usage in cpu_usage]
     
     def get_stats(self):
         stats = SystemStats()
-        stats.cpu['usage'] = self.cpu_usage.avg
-        stats.cpu['per_cpu'] = self.cpu_usage
-        stats.cpu['processors'] = self.cpu_count
-        stats.cpu['bogomips'] = 0.0 # FIXME: read from proc
         
+        stats.cpu = self._get_cpu_stats_()
+        stats.memory = self._get_mem_stats_()
+        stats.system = self._get_system_stats_()
+        stats.disk = self._get_disk_stats_()
+        
+        return stats
+    
+    def _get_disk_stats_(self):
+        stats = {
+            'ioload': 0.0
+        }
+        
+        return stats
+    
+    def _get_cpu_stats_(self):
+        stats = {
+            'usage': self.cpu_usage_avg,
+            'per_cpu': self.cpu_usage,
+            'processors': self.cpu_count,
+            'bogomips': 0.0 # FIXME: read from proc
+        }
+        return stats
+    
+    def _get_mem_stats_(self):
+        mem = psutil.virtual_memory()
+        stats = {
+            'total': mem.total,
+            'used': mem.used,
+            'available': mem.available
+        }
+        return stats
+    
+    def _get_system_stats_(self):
+        stats = {}
+        one, five, fifteen = os.getloadavg()
+        stats['load'] = [one, five, fifteen]
         
         return stats
     
@@ -70,15 +106,14 @@ class StatsTracker:
 
 
 if __name__ == '__main__':
-    import psutil
-    import os
-
-    print("CPU usage: %s"%str(psutil.cpu_percent()))
-    print("Mem usage: %s"%(str(psutil.virtual_memory())))
-    print("CPUs count: %d"%psutil.cpu_count())
-    print("CPU usage (per cpu): %s"%psutil.cpu_percent(percpu=True))
-    print("System load: %s" % str(os.getloadavg()))
-    print("IO (for /): %s" % str(psutil.disk_io_counters()))
-
-    cps = psutil.cpu_percent(interval=0.5,percpu=True)
-    print(cps)
+    import json
+    import time
+    
+    tracker = StatsTracker(period=1000)
+    
+    while(True):
+        s = tracker.get_stats()
+        print(json.dumps(s.__dict__, indent=2))
+        
+        time.sleep(1)
+    

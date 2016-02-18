@@ -17,7 +17,7 @@ class IntervalTimer:
         if self.first:
             interval = interval + self.offset
             self.first = False
-        self.timer = Timer(interval/1000, self._run_)
+        self._run_()
         
         
     def cancel(self):
@@ -28,6 +28,8 @@ class IntervalTimer:
     
     def _run_(self):
         self.running = True
+        self.timer = Timer(self.interval/1000, self._run_)
+        self.timer.start()
         self.run()
         self.running = False
     
