@@ -15,12 +15,18 @@ def configure_node_parser():
     # Store
     parser.add_argument('--storage-root', default='.data', help='Root path of the storage directory')
     
+    # System statistics
+    parser.add_argument('--stats-update-interval', default=30000, help='Statistics update interval in milliseconds')
+    
     parser.add_argument('-v', '--version', action='store_true', help='Print version and exit')
     
     return parser
     
 
 def run_node():
+    import signal
+    
+    
     parser = configure_node_parser()
     args = parser.parse_args()
     
@@ -28,17 +34,25 @@ def run_node():
         print('0.0.1')
         return
     config = {
-        'store':{
+        'store': {
             'path': args.storage_root
         },
-        'server':{
+        'server': {
             'hostname': args.host,
             'port': args.port
+        },
+        'stats': {
+            'update_interval': args.stats_update_interval
         }
     }
     node = Node(node_id=args.node, config=config)
     
+    def handle_node_shutdown(signal, frame):
+        node.stop()
+    
+    signal.signal(signal.SIGINT, handle_node_shutdown)
+    
     node.start()
     
-    print('Started')
+    return node
     
