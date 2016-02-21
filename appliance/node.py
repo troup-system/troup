@@ -59,6 +59,9 @@ class Node:
         if self.stats_tracker:
             self.stats_tracker.stop_tracking()
             print('Statistics tracking has stopped')
+        if self.aio_server:
+            self.aio_server.stop()
+            print('Async I/O Server notified to stop')
 
     def register_remote_node(self, node_id, host, port):
         pass

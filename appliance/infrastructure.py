@@ -211,16 +211,25 @@ class AsyncIOWebSocketServer:
         self.running = False
         self.channels = {}
         self.listeners = []
+        self.aio_sf = None
         
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
         sf = self.aio_loop.create_server(proto, self.host, self.port)
         s = self.aio_loop.run_until_complete(sf)
         print('stared on %s' % str(s.sockets[0].getsockname()))
+        self.aio_sf = sf
         self.aio_loop.run_forever()
+        self.aio_loop.close()
+        print('Async Event loop closed.')
+        
         
     def stop(self):
-        self.aio_loop.stop()
+        def stop_server_and_loop():
+            self.aio_sf.close()
+            self.aio_loop.stop()
+            print('Server closed. Event loop notified for stop.')
+        self.aio_loop.call_soon_threadsafe(stop_server_and_loop)
         
     def on_channel_open(self, channel):
         self.channels[channel.name] = channel

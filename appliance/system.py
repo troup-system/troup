@@ -54,7 +54,7 @@ class StatsTracker:
         self.periodic_update.start()
     
     def refresh_values(self):
-        cpu_usage = psutil.cpu_percent(interval=self.period/1000,percpu=True)
+        cpu_usage = psutil.cpu_percent(percpu=True)
         print('cpu_usage=%s'%cpu_usage)
         self.cpu_usage = [usage/100 for usage in cpu_usage]
     
