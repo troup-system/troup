@@ -25,6 +25,12 @@ class MessageBuilder:
         self.message.data = message_data
         return self
     
+    def value(self, key, value):
+        if not self.message.data:
+            self.message.data = {}
+        self.message.data[key] = value
+        return self
+    
     def header(self, name, value):
         self.message.headers[name] = value
         return self

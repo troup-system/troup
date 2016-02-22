@@ -3,6 +3,7 @@ __author__ = 'pavle'
 from appliance.store import InMemorySyncedStore
 from appliance.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager
 from appliance.system import StatsTracker
+from appliance.messaging import message
 import threading
 
 
@@ -62,23 +63,65 @@ class Node:
         if self.aio_server:
             self.aio_server.stop()
             print('Async I/O Server notified to stop')
-
-    def register_remote_node(self, node_id, host, port):
-        pass
-
-    def unregister_remote_node(self, node_id):
-        pass
-
-    def sync_with(self, node_id):
-        pass
-
-    def sync_with_all(self):
+    
+    def get_node_info(self):
         pass
       
-        
+
+class NodeInfo:
+    self __init__(self, name, stats, apps, endpoint):
+        self.name = name
+        self.stats = stats
+        self.apps = apps
+        self.endpoint = endpoint
+
+class EventProcessor:
+    def __init__(self, node):
+        self.node = node
+        self.handlers = {}
+    
+    def process(self, event, message):
+        handlers = self.handlers.get(event)
+        if handlers:
+            for handler in handlers:
+                handler(message, event, self)
+    
+    def register_handler(self, event_name, handler):
+        handlers = self.handlers.get(event_name)
+        if not handlers:
+            handlers = self.handlers[event_name] = []
+        handlers.append(handler)
+
+
 class SyncManager:
     
-    def __init__(self, channel_manager):
+    def __init__(self, node, channel_manager, event_processor):
+        self.node = node
         self.channel_manager = channel_manager
-        self.known_nodes = []
+        self.event_processor= event_processor
+        self.known_nodes = {}
+    
+    def start(self):
+        pass
+        
+    def stop(self):
+        pass
+    
+    def register_node(self, node):
+        pass
+    
+    def unregister_node(self, node):
+        pass
+        
+    def sync_random_nodes(self):
+        pass
+        
+    def sync_one_node(self, node, this_node_info):
+        pass
+    
+    def get_sync_message(self):
+        return message().value('node', self.node.get_node_info()).
+            value('known_nodes', [n for k,n in self.known_nodes.items()]).
+            .value('type', 'sync-message').build()
+    
     
