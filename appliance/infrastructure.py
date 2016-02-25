@@ -321,7 +321,7 @@ class ChannelManager(Observable):
             self._on_open_channel(channel)
         elif event == 'channel.closed':
             pass
-        else
+        else:
             pass
         
     
@@ -341,6 +341,14 @@ class ChannelManager(Observable):
     
     def _on_open_channel_(self, channel):
         channel.on('closed', self._handle_closed_channel_)
+        
+        def get_data_listener(channel):
+            def data_listener(data):
+                self.trigger('channel.data', data, channel)
+            return data_listener
+        
+        channel.register_listener(get_data_listener(channel))
+        
         self.trigger('channel.open', channel)
     
     def _handle_closed_channel_(self, channel, code, reason=None):
@@ -355,7 +363,20 @@ class ChannelManager(Observable):
         channel = self.channel(name, to_url)
         channel.send(data)
     
-
+    def on_data(self, callback, from_channel=None):
+        def actual_callback_no_filter(data, channel):
+            callback(data)
+        
+        def actual_callback_with_filter(data, channel):
+            if channel.name == from_channel:
+                callback(data)
+        
+        if from_channel:
+            self.on('channel.data', actual_callback_with_filter)
+        else:
+            self.on('channel.data', actual_callback_no_filter)
+        
+            
 
 
 # -- simlest message bus in the world

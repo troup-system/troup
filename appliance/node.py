@@ -65,11 +65,11 @@ class Node:
             print('Async I/O Server notified to stop')
     
     def get_node_info(self):
-        pass
+        return NodeInfo(name=self.name, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint='N/A')
       
 
 class NodeInfo:
-    self __init__(self, name, stats, apps, endpoint):
+    def __init__(self, name, stats, apps, endpoint):
         self.name = name
         self.stats = stats
         self.apps = apps
@@ -120,8 +120,8 @@ class SyncManager:
         pass
     
     def get_sync_message(self):
-        return message().value('node', self.node.get_node_info()).
-            value('known_nodes', [n for k,n in self.known_nodes.items()]).
-            .value('type', 'sync-message').build()
+        return message().value('node', self.node.get_node_info()).\
+            value('known_nodes', [n for k,n in self.known_nodes.items()]).\
+            value('type', 'sync-message').build()
     
     
