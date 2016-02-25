@@ -4,7 +4,7 @@ __author__ = 'pavle'
 
 from types import FunctionType
 from types import MethodType
-
+from appliance.observer import Observable
 
 class ChannelError(Exception):
     pass
@@ -234,9 +234,11 @@ class AsyncIOWebSocketServer:
     def on_channel_open(self, channel):
         self.channels[channel.name] = channel
         print('Channel %s => %s added' % (channel.name, channel))
+        self.notify_event('channel.open', channel)
     
     def on_channel_closed(self, channel):
         del self.channels[channel]
+        self.notify_event('channel.closed', channel)
     
     def on_event(self, callback):
         self.listeners.append(callback)
@@ -305,14 +307,24 @@ class OutgoingChannelOverWS(Channel):
         self.web_socket.close()
 
 
-class ChannelManager:
+class ChannelManager(Observable):
     
     def __init__(self, aio_server):
         #self.config = config
+        super(ChannelManager, self).__init__()
         self.aio_server = aio_server
         self.channels = {}
         self.log = logging.getLogger('channel-manager')
+    
+    def _aio_server_event_(self, event, channel):
+        if event == 'channel.open':
+            self._on_open_channel(channel)
+        elif event == 'channel.closed':
+            pass
+        else
+            pass
         
+    
     def channel(self, name=None, to_url=None):
         if self.channels.get(name):
             return self.channels[name]
@@ -324,11 +336,16 @@ class ChannelManager:
     
     def open_channel_to(self, url):
         och = OutgoingChannelOverWS(name=name, to_url=url)
-        och.on('closed', self._handle_closed_channel_)
+        self._on_open_channel_(och)
         return och
+    
+    def _on_open_channel_(self, channel):
+        channel.on('closed', self._handle_closed_channel_)
+        self.trigger('channel.open', channel)
     
     def _handle_closed_channel_(self, channel, code, reason=None):
         del self.channels[channel.name]
+        self.trigger('channel.close', channel)
     
     def listen(self, name=None, to_url=None, listener=None):
         channel = self.channel(name, to_url)
