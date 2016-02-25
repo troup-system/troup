@@ -78,7 +78,7 @@ class Channel:
             callbacks.append(callback)
     
     def trigger(self, event, *data):
-        callbacks = self.event_listeners.get(event_name)
+        callbacks = self.event_listeners.get(event)
         if callbacks:
             for callback in callbacks:
                 try:
@@ -212,11 +212,13 @@ class AsyncIOWebSocketServer:
         self.channels = {}
         self.listeners = []
         self.aio_sf = None
+        self.server_address = None
         
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
         sf = self.aio_loop.create_server(proto, self.host, self.port)
         s = self.aio_loop.run_until_complete(sf)
+        self.server_address = s.sockets[0].getsockname()
         print('stared on %s' % str(s.sockets[0].getsockname()))
         self.aio_sf = sf
         self.aio_loop.run_forever()
@@ -244,9 +246,11 @@ class AsyncIOWebSocketServer:
         self.listeners.append(callback)
     
     def notify_event(self, event, channel):
-        for listener in listeners:
+        for listener in self.listeners:
             listener(event, channel)
     
+    def get_server_endpoint(self):
+        return 'ws://%s:%d' % (self.server_address, self.port)
 # -- outgoing connection
 
 from ws4py.client.threadedclient import WebSocketClient

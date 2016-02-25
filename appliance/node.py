@@ -3,9 +3,10 @@ __author__ = 'pavle'
 from appliance.store import InMemorySyncedStore
 from appliance.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager
 from appliance.system import StatsTracker
-from appliance.messaging import message
+from appliance.messaging import message, serialize, deserialize, deserialize_dict, Message
 import threading
-
+from appliance.threading import IntervalTimer
+from appliance.apps import App
 
 class Node:
 
@@ -65,7 +66,7 @@ class Node:
             print('Async I/O Server notified to stop')
     
     def get_node_info(self):
-        return NodeInfo(name=self.name, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint='N/A')
+        return NodeInfo(name=self.name, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
       
 
 class NodeInfo:
@@ -93,19 +94,52 @@ class EventProcessor:
         handlers.append(handler)
 
 
+def node_info_from_dict(node_dict):
+    apps = []
+    dapps = node_dict.get('apps') or []
+     
+    for dapp in dapps:
+        app = deserialize_dict(dapp, App)
+        apps.append(app)
+    node = deserialize_dict(node_dict, NodeInfo)
+    node.apps = apps
+    return node
+
 class SyncManager:
     
-    def __init__(self, node, channel_manager, event_processor):
+    def __init__(self, node, channel_manager, event_processor, sync_interval=60000):
         self.node = node
         self.channel_manager = channel_manager
         self.event_processor= event_processor
         self.known_nodes = {}
+        self.sync_timer = IntervalTimer(offset=sync_interval, interval=sync_interval, target=self.sync_random_nodes)
+    
+    
+    def _on_message_(self, msg_str):
+        msg = deserialize(msg_str, as_type=Message)
+        if msg.data.get('type') == 'sync-message':
+            self._on_sync_message_(msg)
+    
+    def _on_sync_message_(self, msg):
+        print('Got sync message -> %s' % msg)
+        print(' : From node %s(%s)' % (msg.data['node']['name'], msg.data['node']['endpoint']))
+        nodes = [node_info_from_dict(msg.data['node'])]
+        
+        known_nodes = [node_info_from_dict(node) for name, node in msg.data['known_nodes'].items()]
+        nodes = nodes + known_nodes
+        self._merge_nodes_list_(nodes)
+    
+    def _merge_nodes_list_(self, nodes):
+        pass
+        # if not in known node => new node and send sync
+        # if endpoint chnaged => close existing channel
+    
     
     def start(self):
-        pass
+        self.sync_timer.start()
         
     def stop(self):
-        pass
+        self.sync_timer.cancel()
     
     def register_node(self, node):
         pass

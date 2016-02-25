@@ -64,3 +64,14 @@ def deserialize(smsg, as_type=None, strict=False):
     return msg 
 
 
+def deserialize_dict(dval, as_type, strict=None):
+    val = as_type()
+    
+    for name, value in val.items():
+        if hasattr(val, name):
+            setattr(val, name, value)
+        elif strict:
+            raise Error('No such property %s' % name)
+    
+    return val
+
