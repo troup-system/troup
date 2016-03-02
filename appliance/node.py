@@ -7,6 +7,9 @@ from appliance.messaging import message, serialize, deserialize, deserialize_dic
 import threading
 from appliance.threading import IntervalTimer
 from appliance.apps import App
+import random
+from math import ceil
+
 
 class Node:
 
@@ -17,16 +20,20 @@ class Node:
         self.channel_manager = None
         self.aio_server = None
         self.stats_tracker = None
+        self.sync_manager = None
     
     def _start_channel_manager_(self):
         aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
         def start_aio_server():
+            print('AIO Server start')
             aio_srv.start()
+            print('AIO Server end')
         th = threading.Thread(target=start_aio_server)
         th.start()
-        print('1')
+        print('Notify aio server to start')
         channel_manager = ChannelManager(aio_srv)
         self.aio_server = aio_srv
+        return channel_manager
     
     def _build_store_(self):
         store = InMemorySyncedStore(root_path=self.config['store']['path'])
@@ -35,6 +42,18 @@ class Node:
     def _start_stats_tracker_(self):
         self.stats_tracker = StatsTracker(period=self.config['stats']['update_interval'])
         print('stats tracking ON')
+    
+    def _start_sync_manager_(self):
+        self.sync_manager = SyncManager(node=self, channel_manager=self.channel_manager, event_processor=None, sync_interval=10000, sync_percent=0.3)
+        self.sync_manager.start()
+        
+        neighbours = self.config.get('neighbours')
+        if neighbours:
+            for url in neighbours:
+                name, sep, endpoint = url.partition(':')
+                node = NodeInfo(name=name, stats=None, apps=None, endpoint=endpoint)
+                self.sync_manager.register_node(node)
+                print('Added neighbour %s [%s]' % (name, endpoint))
     
     def get_available_apps(self):
         return [app.name for app in self.store.apps]
@@ -55,6 +74,7 @@ class Node:
         self.channel_manager = self._start_channel_manager_()
         print('Node %s started' % self.node_id)
         self._start_stats_tracker_()
+        self._start_sync_manager_()
 
     def stop(self):
         print('node stop')
@@ -64,13 +84,15 @@ class Node:
         if self.aio_server:
             self.aio_server.stop()
             print('Async I/O Server notified to stop')
+        if self.sync_manager:
+            self.sync_manager.stop()
     
     def get_node_info(self):
-        return NodeInfo(name=self.name, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
+        return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
       
 
 class NodeInfo:
-    def __init__(self, name, stats, apps, endpoint):
+    def __init__(self, name=None, stats=None, apps=None, endpoint=None):
         self.name = name
         self.stats = stats
         self.apps = apps
@@ -105,18 +127,45 @@ def node_info_from_dict(node_dict):
     node.apps = apps
     return node
 
+
+class RandomBuffer:
+    
+    def __init__(self, nodes_dict):
+        self.nodes_dict = nodes_dict
+        self.buffer = []
+        self._shuffle_()
+        
+        
+    def next(self, n):
+        n = int(ceil(n))
+        while len(self.buffer) < n:
+            self._shuffle_()
+        shuffled = self.buffer[0:n]
+        self.buffer = self.buffer[n:]
+        return shuffled
+    
+    def _shuffle_(self):
+        nodes = [name for name, node in self.nodes_dict.items()]
+        random.shuffle(nodes)
+        self.buffer = self.buffer + nodes
+    
+    
+    
+    
 class SyncManager:
     
-    def __init__(self, node, channel_manager, event_processor, sync_interval=60000):
+    def __init__(self, node, channel_manager, event_processor, sync_interval=60000, sync_percent=0.3):
         self.node = node
         self.channel_manager = channel_manager
         self.event_processor= event_processor
+        self.sync_percent = sync_percent
         self.known_nodes = {}
+        self.random_buffer = RandomBuffer(self.known_nodes)
         self.sync_timer = IntervalTimer(offset=sync_interval, interval=sync_interval, target=self.sync_random_nodes)
     
-    
-    def _on_message_(self, msg_str):
+    def _on_message_(self, msg_str, channel):
         msg = deserialize(msg_str, as_type=Message)
+        print('Got message [%s]' % msg.__dict__)
         if msg.data.get('type') == 'sync-message':
             self._on_sync_message_(msg)
     
@@ -125,31 +174,64 @@ class SyncManager:
         print(' : From node %s(%s)' % (msg.data['node']['name'], msg.data['node']['endpoint']))
         nodes = [node_info_from_dict(msg.data['node'])]
         
-        known_nodes = [node_info_from_dict(node) for name, node in msg.data['known_nodes'].items()]
+        known_nodes = [node_info_from_dict(node) for node in msg.data['known_nodes']]
         nodes = nodes + known_nodes
         self._merge_nodes_list_(nodes)
     
     def _merge_nodes_list_(self, nodes):
-        pass
-        # if not in known node => new node and send sync
-        # if endpoint chnaged => close existing channel
+        new_nodes = False
+        for node in nodes:
+            if not self.known_nodes.get(node.name):
+                new_nodes = True
+                self.known_nodes[node.name] = node
+            self._merge_node_(node)
+        
+        if new_nodes:
+            self.sync_random_nodes()
+        
+    def _merge_node_(self, node):
+        existing = self.known_nodes[node.name]
+        self.known_nodes[node.name] = node
+        if existing.endpoint != node.endpoint:
+            self.channel_manager.close_channel(existing.endpoint)
     
+    def _on_closed_channel_(self, channel):
+        to_remove = []
+        for name, node in self.known_nodes.items():
+            if node.endpoint == channel.to_url:
+                to_remove.append(name)
+        
+        for name in to_remove:
+            del self.known_nodes[name]
     
     def start(self):
         self.sync_timer.start()
         
+        self.channel_manager.on('channel.closed', self._on_closed_channel_)
+        self.channel_manager.on('channel.data', self._on_message_)
+        
     def stop(self):
         self.sync_timer.cancel()
-    
+        self.channel_manager.remove_listener('channel.closed', self._on_closed_channel_)
+        
     def register_node(self, node):
-        pass
+        if self.known_nodes.get(node.name):
+            self._merge_node_(node)
+        else:
+            self.known_nodes[node.name] = node
     
     def unregister_node(self, node):
         pass
-        
+            
     def sync_random_nodes(self):
-        pass
+        nodes = self.random_buffer.next(len(self.known_nodes) * self.sync_percent)
         
+        for name in nodes:
+            if self.known_nodes.get(name):
+                node = self.known_nodes[name]
+                print('Sync with %s' % name)
+                self.channel_manager.send(to_url=node.endpoint, data=serialize(self.get_sync_message(), indent=2))
+                
     def sync_one_node(self, node, this_node_info):
         pass
     

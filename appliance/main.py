@@ -43,7 +43,8 @@ def run_node():
         },
         'stats': {
             'update_interval': args.stats_update_interval
-        }
+        },
+        'neighbours': args.neighbours
     }
     node = Node(node_id=args.node, config=config)
     

@@ -44,18 +44,23 @@ def message(id=None, data=None):
     return MessageBuilder().id(id).data(data)
 
 
+class DictEncoder(json.JSONEncoder):
+    
+    def default(self, o):
+        return o.__dict__
+
 
 def serialize(msg, indent=None):
-    return json.dumps(msg, indent=indent)
+    return json.dumps(msg, indent=indent, cls=DictEncoder)
 
 
 def deserialize(smsg, as_type=None, strict=False):
     msg_type = as_type or Message
-    dmsg = json.reads(smsg)
+    dmsg = json.loads(smsg)
     
     msg = msg_type()
     
-    for name, value in msg.items():
+    for name, value in dmsg.items():
         if hasattr(msg, name):
             setattr(msg, name, value)
         elif strict:
@@ -67,7 +72,7 @@ def deserialize(smsg, as_type=None, strict=False):
 def deserialize_dict(dval, as_type, strict=None):
     val = as_type()
     
-    for name, value in val.items():
+    for name, value in dval.items():
         if hasattr(val, name):
             setattr(val, name, value)
         elif strict:

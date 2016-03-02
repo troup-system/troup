@@ -24,6 +24,7 @@ class Channel:
         self.status = 'CREATED'
         self.listeners = []
         self.event_listeners = {}
+        self.to_url = to_url
         
     def open(self):
         if self.status is not Channel.CREATED:
@@ -54,7 +55,7 @@ class Channel:
         pass
     
     def register_listener(self, callback):
-        listener = self.__wrap_listener__(self, callback)
+        listener = self.__wrap_listener__(callback)
         self.listeners.append(listener)
     
     def __wrap_listener__(self, callback):
@@ -64,11 +65,12 @@ class Channel:
         pass
 
     def data_received(self, data):
+        print('DR: Listeners -> %s' % self.listeners)
         for listener in self.listeners:
             try:
                 listener.on_data(data)
             except Exception as e:
-                logging.warning('Listener error: ', e)
+                logging.exception('Listener error: %s', e)
     
     def on(self, event_name, callback):
         callbacks = self.event_listeners.get(event_name)
@@ -103,7 +105,6 @@ class ListenerWrapper:
         self.delegate(data)
 
 
-#from ws4py.websocket import WebSocket
 from ws4py.async_websocket import WebSocket
 from threading import Event
 
@@ -159,9 +160,10 @@ class IncomingChannelWSAdapter(WebSocket):
         self.server.on_channel_closed(self.channel)
     
     def received_message(self, message):
-        print(' -> %s' % str(message))
+        #print(' -> %s' % str(message))
+        #print('Message is text %s - data[%s]' % (message.is_text,message.data))
         try:
-            self.channel.data_received(message.data)
+            self.channel.data_received(str(message))
         except Exception as e:
             logging.exception(e)
 
@@ -216,6 +218,7 @@ class AsyncIOWebSocketServer:
         
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
+        asyncio.set_event_loop(self.aio_loop)
         sf = self.aio_loop.create_server(proto, self.host, self.port)
         s = self.aio_loop.run_until_complete(sf)
         self.server_address = s.sockets[0].getsockname()
@@ -250,7 +253,7 @@ class AsyncIOWebSocketServer:
             listener(event, channel)
     
     def get_server_endpoint(self):
-        return 'ws://%s:%d' % (self.server_address, self.port)
+        return 'ws://%s:%s' % (self.server_address, self.port)
 # -- outgoing connection
 
 from ws4py.client.threadedclient import WebSocketClient
@@ -309,7 +312,9 @@ class OutgoingChannelOverWS(Channel):
     
     def disconnect(self):
         self.web_socket.close()
-
+    
+    def send(self, data):
+        self.web_socket.send(payload=data)
 
 class ChannelManager(Observable):
     
@@ -319,10 +324,12 @@ class ChannelManager(Observable):
         self.aio_server = aio_server
         self.channels = {}
         self.log = logging.getLogger('channel-manager')
-    
+        self.aio_server.on_event(self._aio_server_event_)
+        
+        
     def _aio_server_event_(self, event, channel):
         if event == 'channel.open':
-            self._on_open_channel(channel)
+            self._on_open_channel_(channel)
         elif event == 'channel.closed':
             pass
         else:
@@ -338,16 +345,21 @@ class ChannelManager(Observable):
         self.channels[name] = channel
         return channel
     
-    def open_channel_to(self, url):
+    def open_channel_to(self, name, url):
         och = OutgoingChannelOverWS(name=name, to_url=url)
         self._on_open_channel_(och)
+        och.open()
         return och
+    
+    def close_channel(self, name=None, endpoint=None):
+        pass
     
     def _on_open_channel_(self, channel):
         channel.on('closed', self._handle_closed_channel_)
         
         def get_data_listener(channel):
             def data_listener(data):
+                print('Triggering channel.data')
                 self.trigger('channel.data', data, channel)
             return data_listener
         
@@ -366,7 +378,8 @@ class ChannelManager(Observable):
     def send(self, name=None, to_url=None, data=None):
         channel = self.channel(name, to_url)
         channel.send(data)
-    
+        #print('FIXME: Actual send')
+        
     def on_data(self, callback, from_channel=None):
         def actual_callback_no_filter(data, channel):
             callback(data)
