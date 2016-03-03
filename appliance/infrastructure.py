@@ -253,7 +253,7 @@ class AsyncIOWebSocketServer:
             listener(event, channel)
     
     def get_server_endpoint(self):
-        return 'ws://%s:%s' % (self.server_address, self.port)
+        return 'ws://%s:%s' % (self.host, self.port)
 # -- outgoing connection
 
 from ws4py.client.threadedclient import WebSocketClient

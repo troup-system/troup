@@ -165,13 +165,13 @@ class SyncManager:
     
     def _on_message_(self, msg_str, channel):
         msg = deserialize(msg_str, as_type=Message)
-        print('Got message [%s]' % msg.__dict__)
+        #print('Got message [%s]' % msg.__dict__)
         if msg.data.get('type') == 'sync-message':
             self._on_sync_message_(msg)
     
     def _on_sync_message_(self, msg):
-        print('Got sync message -> %s' % msg)
-        print(' : From node %s(%s)' % (msg.data['node']['name'], msg.data['node']['endpoint']))
+        #print('Got sync message -> %s' % msg)
+        #print(' : From node %s(%s)' % (msg.data['node']['name'], msg.data['node']['endpoint']))
         nodes = [node_info_from_dict(msg.data['node'])]
         
         known_nodes = [node_info_from_dict(node) for node in msg.data['known_nodes']]
@@ -179,16 +179,20 @@ class SyncManager:
         self._merge_nodes_list_(nodes)
     
     def _merge_nodes_list_(self, nodes):
-        new_nodes = False
         for node in nodes:
+            if node.name == self.node.node_id:
+                continue
             if not self.known_nodes.get(node.name):
-                new_nodes = True
                 self.known_nodes[node.name] = node
+                print('Node %s has joined' % node.name)
+                self._print_known_nodes_()
             self._merge_node_(node)
-        
-        if new_nodes:
-            self.sync_random_nodes()
-        
+    
+    def _print_known_nodes_(self):
+        print(' Members: ')
+        for name, node in self.known_nodes.items():
+            print('   %s[%s]' %(name, node.endpoint) )
+    
     def _merge_node_(self, node):
         existing = self.known_nodes[node.name]
         self.known_nodes[node.name] = node
