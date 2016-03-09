@@ -62,7 +62,7 @@ class Channel:
         return ListenerWrapper(callback)
     
     def send(self, data):
-        pass
+        print('[CH<Channel>: %s]: empty send' % self.name)
 
     def data_received(self, data):
         print('DR: Listeners -> %s' % self.listeners)
@@ -125,6 +125,7 @@ class IncommingChannel(Channel):
         self.close_event.set()
     
     def send(self, data):
+        print('[CH<IncommingChannel>: %s]: sending data' % self.name)
         if self.status is Channel.OPEN:
             self.adapter.send(payload=data)
         else:
@@ -314,6 +315,7 @@ class OutgoingChannelOverWS(Channel):
         self.web_socket.close()
     
     def send(self, data):
+        print('[CH<OutgoingChannelOverWS>: %s]: sending data' % self.name)
         self.web_socket.send(payload=data)
 
 class ChannelManager(Observable):
@@ -323,6 +325,7 @@ class ChannelManager(Observable):
         super(ChannelManager, self).__init__()
         self.aio_server = aio_server
         self.channels = {}
+        self.by_url = {}
         self.log = logging.getLogger('channel-manager')
         self.aio_server.on_event(self._aio_server_event_)
         
@@ -339,10 +342,15 @@ class ChannelManager(Observable):
     def channel(self, name=None, to_url=None):
         if self.channels.get(name):
             return self.channels[name]
+        if to_url and self.by_url.get(to_url):
+            return self.by_url[to_url]
         if not to_url:
             raise Exception('No channel URL specified')
+        if not name and to_url:
+            name = to_url
         channel = self.open_channel_to(name, to_url)
         self.channels[name] = channel
+        self.by_url[to_url] = channel
         return channel
     
     def open_channel_to(self, name, url):
@@ -369,6 +377,7 @@ class ChannelManager(Observable):
     
     def _handle_closed_channel_(self, channel, code, reason=None):
         del self.channels[channel.name]
+        del self.by_url[channel.endpoint]
         self.trigger('channel.close', channel)
     
     def listen(self, name=None, to_url=None, listener=None):

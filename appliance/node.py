@@ -233,7 +233,7 @@ class SyncManager:
         for name in nodes:
             if self.known_nodes.get(name):
                 node = self.known_nodes[name]
-                print('Sync with %s' % name)
+                print('Sync with %s [%s]' % (name, node.endpoint))
                 self.channel_manager.send(to_url=node.endpoint, data=serialize(self.get_sync_message(), indent=2))
                 
     def sync_one_node(self, node, this_node_info):
