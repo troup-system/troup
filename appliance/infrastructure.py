@@ -5,6 +5,7 @@ __author__ = 'pavle'
 from types import FunctionType
 from types import MethodType
 from appliance.observer import Observable
+import logging
 
 class ChannelError(Exception):
     pass
@@ -25,6 +26,7 @@ class Channel:
         self.listeners = []
         self.event_listeners = {}
         self.to_url = to_url
+        self.log = logging.getLogger(self.__class__.__name__)
         
     def open(self):
         if self.status is not Channel.CREATED:
@@ -62,15 +64,14 @@ class Channel:
         return ListenerWrapper(callback)
     
     def send(self, data):
-        print('[CH<Channel>: %s]: empty send' % self.name)
+        self.log.debug('[CH<Channel>: %s]: empty send' % self.name)
 
     def data_received(self, data):
-        print('DR: Listeners -> %s' % self.listeners)
         for listener in self.listeners:
             try:
                 listener.on_data(data)
             except Exception as e:
-                logging.exception('Listener error: %s', e)
+                self.log.exception('Listener error: %s', e)
     
     def on(self, event_name, callback):
         callbacks = self.event_listeners.get(event_name)
@@ -86,7 +87,7 @@ class Channel:
                 try:
                     callback(*data)
                 except Exception as e:
-                    logging.debug('An error while triggering event {}', event, e)
+                    self.log.debug('An error while triggering event {}', event, e)
 
 class ListenerWrapper:
     def __init__(self, delegate):
@@ -125,7 +126,6 @@ class IncommingChannel(Channel):
         self.close_event.set()
     
     def send(self, data):
-        print('[CH<IncommingChannel>: %s]: sending data' % self.name)
         if self.status is Channel.OPEN:
             self.adapter.send(payload=data)
         else:
@@ -135,12 +135,10 @@ class IncommingChannel(Channel):
 class IncomingChannelWSAdapter(WebSocket):
     
     def __init__(self, protocol):
-        print('Adapter starts... Protcol: %s' % str(protocol) )
         WebSocket.__init__(self, protocol)
         self.server = None 
-        
+        self.log = logging.getLogger(self.__class__.__name__)
         self.channel = None
-        print('Adapter started')
     
     def opened(self):
         self.server = self.proto.server
@@ -156,7 +154,7 @@ class IncomingChannelWSAdapter(WebSocket):
             raise e
     
     def closed(self, code, reason=None):
-        print('closing ws. code=%s, reason=%s'%(str(code),str(reason)))
+        self.log.debug('closing ws. code=%s, reason=%s'%(str(code),str(reason)))
         self.channel.notify_close()
         self.server.on_channel_closed(self.channel)
     
@@ -216,6 +214,7 @@ class AsyncIOWebSocketServer:
         self.listeners = []
         self.aio_sf = None
         self.server_address = None
+        self.log = logging.getLogger('AsyncIOWebSocketServer')
         
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
@@ -223,23 +222,23 @@ class AsyncIOWebSocketServer:
         sf = self.aio_loop.create_server(proto, self.host, self.port)
         s = self.aio_loop.run_until_complete(sf)
         self.server_address = s.sockets[0].getsockname()
-        print('stared on %s' % str(s.sockets[0].getsockname()))
+        self.log.info('Server stared on %s' % str(s.sockets[0].getsockname()))
         self.aio_sf = sf
         self.aio_loop.run_forever()
         self.aio_loop.close()
-        print('Async Event loop closed.')
+        self.log.debug('Async Event loop closed.')
         
         
     def stop(self):
         def stop_server_and_loop():
             self.aio_sf.close()
             self.aio_loop.stop()
-            print('Server closed. Event loop notified for stop.')
+            self.log.debug('Server closed. Event loop notified for stop.')
         self.aio_loop.call_soon_threadsafe(stop_server_and_loop)
         
     def on_channel_open(self, channel):
         self.channels[channel.name] = channel
-        print('Channel %s => %s added' % (channel.name, channel))
+        self.log.debug('Channel %s => %s added' % (channel.name, channel))
         self.notify_event('channel.open', channel)
     
     def on_channel_closed(self, channel):
@@ -315,7 +314,6 @@ class OutgoingChannelOverWS(Channel):
         self.web_socket.close()
     
     def send(self, data):
-        print('[CH<OutgoingChannelOverWS>: %s]: sending data' % self.name)
         self.web_socket.send(payload=data)
 
 class ChannelManager(Observable):
@@ -367,7 +365,6 @@ class ChannelManager(Observable):
         
         def get_data_listener(channel):
             def data_listener(data):
-                print('Triggering channel.data')
                 self.trigger('channel.data', data, channel)
             return data_listener
         
@@ -411,6 +408,7 @@ class MessageBus:
     
     def __init__(self):
         self.subscribers = {}
+        self.log = logging.getLogger(self.__class__.__name__)
     
     def on(self, topic, handler):
         if not handler:
@@ -436,7 +434,7 @@ class MessageBus:
                 try:
                     handler(event)
                 except Exception as e:
-                    print('Woops')
+                    self.log.exception(e)
     
     
     def remove(self, topic, handler):

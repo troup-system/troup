@@ -2,6 +2,9 @@ __author__ = 'pavle'
 
 # https://docs.python.org/3.5/library/subprocess.html
 
+
+from subprocess import Popen
+
 class Process:
     
     def __init__(self, id, name, args=None):
@@ -17,7 +20,14 @@ class Process:
 
 
 class LocalProcess(Process):
-    pass
+    
+    def __init__(self, id, name, args=None, cwd=None):
+        super(self, Process).__init__(id, name, args)
+        self.cwd = cwd
+        self.process = None
+        self.input = None
+        self.output = None
+        self.error = None
     
 
 class RemoteProcess(Process):

@@ -1,5 +1,7 @@
 from argparse import ArgumentParser
 from appliance.node import Node
+import logging
+
 
 def configure_node_parser():
     parser = ArgumentParser(prog='appliance', description='Run single node')
@@ -18,6 +20,8 @@ def configure_node_parser():
     # System statistics
     parser.add_argument('--stats-update-interval', default=30000, help='Statistics update interval in milliseconds')
     
+    parser.add_argument('--log-level', '-l', default='info', help='Logging level')
+    
     parser.add_argument('-v', '--version', action='store_true', help='Print version and exit')
     
     return parser
@@ -33,6 +37,9 @@ def run_node():
     if args.version:
         print('0.0.1')
         return
+        
+    logging.basicConfig(level=getattr(logging, args.log_level.upper()))
+    
     config = {
         'store': {
             'path': args.storage_root
