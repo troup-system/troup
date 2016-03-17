@@ -444,6 +444,27 @@ class MessageBus:
     
     
 
+message_bus = MessageBus()
+
+class Subscribe:
+    def __init__(self, topic, filter=None, bus=None):
+        self.topic = topic
+        self.filter = filter
+        self.bus = bus
+        if not self.bus:
+            self.bus = message_bus
+    
+    def __call__(self, method):
+        self.bus.on(self.topic, method)
+        return method
+
+
+class Bus:
+    
+    def __init__(self):
+        self.subscribe = Subscribe
+        
+bus = Bus()
 
 
 

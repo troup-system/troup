@@ -1,7 +1,7 @@
 __author__ = 'pavle'
 
 from appliance.store import InMemorySyncedStore
-from appliance.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager
+from appliance.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager, message_bus, bus
 from appliance.system import StatsTracker
 from appliance.messaging import message, serialize, deserialize, deserialize_dict, Message
 import threading
@@ -21,6 +21,7 @@ class Node:
         self.aio_server = None
         self.stats_tracker = None
         self.sync_manager = None
+        self.bus = message_bus
     
     def _start_channel_manager_(self):
         aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
@@ -89,7 +90,10 @@ class Node:
     
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
-      
+    
+    @bus.subscribe('task')
+    def __on_task__(self, task):
+        print('Received task: %s' % task)
 
 class NodeInfo:
     def __init__(self, name=None, stats=None, apps=None, endpoint=None):
