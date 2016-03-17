@@ -4,7 +4,7 @@ import psutil
 import os
 import platform
 
-from appliance.threading import IntervalTimer
+from troup.threading import IntervalTimer
 
 class SystemStats:
     """Statistics values for the underlying system.

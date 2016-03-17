@@ -1,6 +1,6 @@
 import json
 import os
-from appliance.apps import App
+from troup.apps import App
 
 __author__ = 'pavle'
 

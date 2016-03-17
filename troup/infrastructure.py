@@ -4,7 +4,7 @@ __author__ = 'pavle'
 
 from types import FunctionType
 from types import MethodType
-from appliance.observer import Observable
+from troup.observer import Observable
 import logging
 
 class ChannelError(Exception):

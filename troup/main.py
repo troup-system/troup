@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
-from appliance.node import Node
+from troup.node import Node
 import logging
 
 
 def configure_node_parser():
-    parser = ArgumentParser(prog='appliance', description='Run single node')
+    parser = ArgumentParser(prog='troup', description='Run single node')
     
     # Node
     parser.add_argument('--node', help='Node ID')

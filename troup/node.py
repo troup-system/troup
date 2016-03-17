@@ -1,12 +1,12 @@
 __author__ = 'pavle'
 
-from appliance.store import InMemorySyncedStore
-from appliance.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager, message_bus, bus
-from appliance.system import StatsTracker
-from appliance.messaging import message, serialize, deserialize, deserialize_dict, Message
+from troup.store import InMemorySyncedStore
+from troup.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager, message_bus, bus
+from troup.system import StatsTracker
+from troup.messaging import message, serialize, deserialize, deserialize_dict, Message
 import threading
-from appliance.threading import IntervalTimer
-from appliance.apps import App
+from troup.threading import IntervalTimer
+from troup.apps import App
 import random
 from math import ceil
 

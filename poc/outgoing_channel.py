@@ -6,7 +6,7 @@ sys.path.append('..')
 
 print(sys.path)
 
-from appliance.infrastructure import OutgoingChannelOverWS
+from troup.infrastructure import OutgoingChannelOverWS
 
 oc = OutgoingChannelOverWS('tc', 'ws://localhost:8910')
 
