@@ -36,6 +36,18 @@ class Node:
         self.aio_server = aio_srv
         return channel_manager
     
+    def __register_message_dispatcher__(self):
+        def on_channel_data(message_str, channel):
+            try:
+                msg = deserialize(message_str)
+                if msg.type:
+                    self.bus.publish(msg.type, msg)
+                else:
+                    self.bus.publish('__message.genericType', msg)
+            except Exception as e:
+                self.log.exception('Failed to handle channel data', e)
+        self.channel_manager.on('channel.data', on_channel_data)
+    
     def _build_store_(self):
         store = InMemorySyncedStore(root_path=self.config['store']['path'])
         return store
@@ -76,6 +88,7 @@ class Node:
         print('Node %s started' % self.node_id)
         self._start_stats_tracker_()
         self._start_sync_manager_()
+        self.__register_message_dispatcher__()
 
     def stop(self):
         print('node stop')
@@ -94,6 +107,10 @@ class Node:
     @bus.subscribe('task')
     def __on_task__(self, task):
         print('Received task: %s' % task)
+    
+    @bus.subscribe('command')
+    def __on_command__(self, command):
+        print('Received command: %s' % command)
 
 class NodeInfo:
     def __init__(self, name=None, stats=None, apps=None, endpoint=None):
@@ -152,8 +169,6 @@ class RandomBuffer:
         nodes = [name for name, node in self.nodes_dict.items()]
         random.shuffle(nodes)
         self.buffer = self.buffer + nodes
-    
-    
     
     
 class SyncManager:

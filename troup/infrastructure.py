@@ -404,13 +404,42 @@ class ChannelManager(Observable):
 
 # -- simlest message bus in the world
 
+class MessageHandler:
+    
+    def __init__(self, handler, message_filter):
+        self.handler = handler
+        self.message_filter = message_filter
+    
+    def __call__(self, message):
+        if self.message_filter:
+            if not self.message_filter(message):
+                return
+        self.handler(message)
+    
+    def __eq__(self, other):
+        if not type(self) is type(other):
+            return False
+        if self.handler and other.handler:
+            if not self.handler.__eq__(other.handler):
+                return False
+            if self.message_filter is not None:
+                if not other.message_filter:
+                    return False
+                return self.message_filter.__eq__(other.message_filter)
+            else:
+                return not other.message_filter
+    
+    def __hash__(self):
+        return self.handler.__hash__()
+
+
 class MessageBus:
     
     def __init__(self):
         self.subscribers = {}
         self.log = logging.getLogger(self.__class__.__name__)
     
-    def on(self, topic, handler):
+    def on(self, topic, handler, message_filter=None):
         if not handler:
             raise Exception('Handler not specified')
         if not topic:
@@ -418,6 +447,7 @@ class MessageBus:
         subscribers = self.__get_subscribers__(topic)
         if handler in subscribers:
             raise Exception('Handler already registered')
+        self.log.debug('Listening on topic %s. Handler %s (filter=%s)', topic, handler, message_filter)
         subscribers.append(handler)
     
     def __get_subscribers__(self, topic):
