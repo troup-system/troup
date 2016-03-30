@@ -40,8 +40,8 @@ class Node:
         def on_channel_data(message_str, channel):
             try:
                 msg = deserialize(message_str)
-                if msg.type:
-                    self.bus.publish(msg.type, msg)
+                if msg.data.get('type'):
+                    self.bus.publish(msg.data['type'], msg)
                 else:
                     self.bus.publish('__message.genericType', msg)
             except Exception as e:
