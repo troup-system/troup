@@ -9,22 +9,24 @@ class Promise:
 
     @property
     def result(self):
-        while not self.__is_done:
-            self.wait()
+        with self.__cw:
+            while not self.__is_done:
+                self.__cw.wait()
 
         if self.error:
             raise DistributedException(self.error, self.__result)
         return self.__result
 
-    @propery
+    @property
     def is_done(self):
         return self.__is_done
 
     def complete(self, result=None, error=None):
         self.__is_done = True
         self.error = error
-        self.result = result
-        self.__cw.notify_all()
+        self.__result = result
+        with self.__cw:
+            self.__cw.notify_all()
 
 
 
