@@ -68,6 +68,9 @@ class Node:
                 self.sync_manager.register_node(node)
                 print('Added neighbour %s [%s]' % (name, endpoint))
     
+    def __register_to_local(self):
+        pass
+    
     def get_available_apps(self):
         return [app.name for app in self.store.apps]
 
