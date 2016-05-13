@@ -4,6 +4,7 @@ __author__ = 'pavle'
 
 
 from subprocess import Popen, PIPE
+from os import path
 
 class Process:
     
@@ -72,4 +73,35 @@ class SSHRemoteProcess(LocalProcess):
 
 class RemoteProcess(Process):
     pass
+
+
+# Proces lockfiles and IPC
+
+class LockFile:
+    
+    def __init__(self, path, content=None, create=False):
+        self.path = path
+        self._content = content
+        self.create_new = create
+        self.file = None
+        self.__open()
+    
+    def __open(self):
+        if not self.exists():
+            if not self.create_new:
+                raise Exception('Lock file not found %s' % self.path)
+            path.touch(self.path)
+        else:
+            if self.create_new:
+                raise Exception('Lock file already exists')
+            self.file = open(self.path)
+    
+    def exists(self):
+        return path.isFile(self.path)
+    
+    @property
+    def content(self, value=None):
+        pass
+
+
 
