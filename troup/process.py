@@ -4,7 +4,8 @@ __author__ = 'pavle'
 
 
 from subprocess import Popen, PIPE
-from os import path
+from os import path, getpid, remove
+import json
 
 class Process:
     
@@ -85,23 +86,82 @@ class LockFile:
         self.create_new = create
         self.file = None
         self.__open()
+        if create and content is not None:
+            self.file.write(self._content)
+            self.file.flush()
     
     def __open(self):
         if not self.exists():
             if not self.create_new:
                 raise Exception('Lock file not found %s' % self.path)
-            path.touch(self.path)
+            self.file = open(self.path, 'w')
         else:
             if self.create_new:
                 raise Exception('Lock file already exists')
             self.file = open(self.path)
     
     def exists(self):
-        return path.isFile(self.path)
+        return path.isfile(self.path)
     
     @property
     def content(self, value=None):
-        pass
+        if not self.file:
+            raise Exception('Lock file not open')
+        if value is not None:
+            self.file.write(value)
+            self.file.flush()
+        else:
+            return self.file.read()
+    
+    def __del__(self):
+        try:
+            if self.file:
+                self.file.close()
+        except:
+            pass
+    
+    def unlock(self):
+        if self.path:
+            remove(self.path)
 
 
+class ProcessInfoFile(LockFile):
+    
+    def __init__(self, path, pid, create=False, with_info=None):
+        self.pid = pid
+        self.info = with_info or {}
+        super(ProcessInfoFile, self).__init__(path=path, content=self.__generate_file_content(), create=create)
+        
+        if not create:
+            self.__parse_file_content()
+    
+    def __generate_file_content(self):
+        return '%d\n%s' % (self.pid, json.dumps(self.info))
+    
+    def __parse_file_content(self):
+        cnt = self.content.splitlines()
+        self.pid = int(cnt[0])
+        self.info = json.reads(cnt[1])
+    
+    def set_info(self, name, info):
+        self.info[name] = info
+        self.content = self.__generate_file_content()
+    
+    def get_info(self, name):
+        return self.info.get(name)
+        
 
+def this_process_info_file(path, info=None, create=False):
+    pid = getpid()
+    try:
+        return ProcessInfoFile(path=path, pid=pid, create=False)
+    except Exception as e:
+        if not create:
+            raise e
+        return ProcessInfoFile(path=path, pid=pid, create=True, with_info=info)        
+
+def open_process_lock_file(path):
+    try:
+        return ProcessInfoFile(path=path, create=False)
+    except:
+        return False

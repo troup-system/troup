@@ -7,8 +7,10 @@ from troup.messaging import message, serialize, deserialize, deserialize_dict, M
 import threading
 from troup.threading import IntervalTimer
 from troup.apps import App
+from troup.process import this_process_info_file, open_process_lock_file
 import random
 from math import ceil
+from os import getpid
 
 
 class Node:
@@ -22,6 +24,21 @@ class Node:
         self.stats_tracker = None
         self.sync_manager = None
         self.bus = message_bus
+        self.lock = None
+        self.pid = getpid()
+    
+    def __lock(self):
+        if self.lock:
+            return self.lock
+        self.__check_lock()
+        self.lock = local_node_lock_file({"name": self.node_id})
+        return self.lock
+    
+    def __check_lock(self):
+        lock = check_local_node_lock()
+        if lock:
+            if lock.pid != self.pid:
+                raise Excepion('Seems there is a node already running. PID is %d. If no node with this pid is running, then you may have to delete the file manually.' % lock.pid)
     
     def _start_channel_manager_(self):
         aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
@@ -87,6 +104,7 @@ class Node:
         pass
 
     def start(self):
+        self.__lock()
         self.channel_manager = self._start_channel_manager_()
         print('Node %s started' % self.node_id)
         self._start_stats_tracker_()
@@ -103,6 +121,7 @@ class Node:
             print('Async I/O Server notified to stop')
         if self.sync_manager:
             self.sync_manager.stop()
+        self.lock.unlock()
     
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
@@ -266,4 +285,13 @@ class SyncManager:
             value('known_nodes', [n for k,n in self.known_nodes.items()]).\
             value('type', 'sync-message').build()
     
-    
+
+
+NODE_LOCK_FILE_PATH = '/tmp/troup.node.lock'
+
+
+def local_node_lock_file(node_info=None):
+    return this_process_info_file(NODE_LOCK_FILE_PATH, info=node_info, create=True)
+
+def check_local_node_lock():
+    return open_process_lock_file(NODE_LOCK_FILE_PATH)
