@@ -1,6 +1,9 @@
 from troup.infrastructure import OutgoingChannelOverWS
 from troup.distributed import Promise
 from troup.threading import IntervalTimer
+from troup.node import read_local_node_lock
+from troup.messaging import message, serialize, deserialize
+
 
 from datetime import datetime, timedelta
 
@@ -11,7 +14,7 @@ class CallbackWrapper:
         self.created_on = created_on or datetime.now()
         self.promise = promise or Promise()
 
-    def check_expired(self)
+    def check_expired(self):
         if datetime.now() > (timedelta(milliseconds=self.valid_for) + self.created_on):
             self.promise.complete(error='Timeout', result=Exception('Timeout'))
     def execute_callback(self, result):
@@ -52,11 +55,13 @@ class ChannelClient:
             if on_reply:
                 on_reply(*args, **kwargs)
 
+        ser_message = serialize(message)
+
         if to_node:
-            self.send_message_to_node(message, to_node, reply_callback_wrapper)
+            self.send_message_to_node(ser_message, to_node, reply_callback_wrapper)
         else:
             for name, node in self.nodes_ref.items():
-                self.send_message_to_node(message, node, reply_callback_wrapper)
+                self.send_message_to_node(ser_message, name, reply_callback_wrapper)
 
     def send_message_to_node(self, message, node, on_reply):
         channel = self.get_channel(node)
@@ -64,7 +69,7 @@ class ChannelClient:
 
 
     def get_channel(self, for_node):
-        channel = self.channel.get(for_node)
+        channel = self.channels.get(for_node)
         if not channel:
             channel = self.build_channel(for_node)
         return channel
@@ -75,9 +80,23 @@ class ChannelClient:
             raise Exception('Unknown node reference [%s]' % for_node)
         return self.create_channel(for_node, ref)
 
-    def create_channel(node_name, reference):
-        return OutgoingChannelOverWS(node_name, reference)
+    def create_channel(self, node_name, reference):
+        def opened(*args):
+            print('OPENED')
 
+        chn =  OutgoingChannelOverWS(node_name, reference)
+        chn.on('open', opened)
+        chn.open()
+        import time
+        time.sleep(2)
+        return chn
+
+
+def client_to_local_node():
+
+    lock = read_local_node_lock()
+    client = ChannelClient(nodes_specs=['%s:%s'%(lock.get_info('name'), lock.get_info('url'))])
+    return client
 
 
 class CommandAPI:
@@ -86,10 +105,10 @@ class CommandAPI:
         self.channel_client = channel_client
 
     def send_command(self, command, to_node=None, on_reply=None):
-        pass
+        return self.channel_client.send_message(message=command, to_node=to_node, on_reply=on_reply)
 
     def monitor(self, command_ref):
         pass
 
     def command(self, name, data):
-        pass
+        return message(data=data).header('type', 'command').build()

@@ -7,19 +7,20 @@ from types import MethodType
 from troup.observer import Observable
 import logging
 
+
 class ChannelError(Exception):
     pass
 
 
 class Channel:
-    
+
     CREATED = 'CREATED'
     CONNECTING = 'CONNECTING'
     OPEN = 'OPEN'
     CLOSING = 'CLOSING'
     CLOSED = 'CLOSED'
     ERROR = 'ERROR'
-    
+
     def __init__(self, name, to_url):
         self.name = name
         self.status = 'CREATED'
@@ -27,7 +28,7 @@ class Channel:
         self.event_listeners = {}
         self.to_url = to_url
         self.log = logging.getLogger(self.__class__.__name__)
-        
+
     def open(self):
         if self.status is not Channel.CREATED:
             raise ChannelError('Unable to open channel')
@@ -38,7 +39,7 @@ class Channel:
         except Exception as e:
             self.status = Channel.ERROR
             raise ChannelError(e)
-        
+
     def close(self):
         if self.status is not Channel.OPEN:
             raise ChannelError('Unable to close channel')
@@ -49,20 +50,20 @@ class Channel:
         except Exception as e:
             self.status = Channel.ERROR
             raise ChannelError(e)
-    
+
     def connect(self):
         pass
-        
+
     def disconnect(self):
         pass
-    
+
     def register_listener(self, callback):
         listener = self.__wrap_listener__(callback)
         self.listeners.append(listener)
-    
+
     def __wrap_listener__(self, callback):
         return ListenerWrapper(callback)
-    
+
     def send(self, data):
         self.log.debug('[CH<Channel>: %s]: empty send' % self.name)
 
@@ -72,14 +73,14 @@ class Channel:
                 listener.on_data(data)
             except Exception as e:
                 self.log.exception('Listener error: %s', e)
-    
+
     def on(self, event_name, callback):
         callbacks = self.event_listeners.get(event_name)
         if not callbacks:
             callbacks = self.event_listeners[event_name] = []
         if not callback in callbacks:
             callbacks.append(callback)
-    
+
     def trigger(self, event, *data):
         callbacks = self.event_listeners.get(event)
         if callbacks:
@@ -92,7 +93,7 @@ class Channel:
 class ListenerWrapper:
     def __init__(self, delegate):
         self.delegate = self.__get_callable__(delegate)
-    
+
     def __get_callable__(self, delegate):
         if isinstance(delegate, FunctionType) or \
            isinstance(delegate, MethodType):
@@ -101,7 +102,7 @@ class ListenerWrapper:
             if hasattr(delegate, 'on_data'):
                 return getattr(delegate, 'on_data')
         raise ChannelError('Invalid listener. It is not a callable object and does not contain on_data method.')
-    
+
     def on_data(self, data):
         self.delegate(data)
 
@@ -111,20 +112,20 @@ from threading import Event
 
 
 class IncommingChannel(Channel):
-    
+
     def __init__(self, name, to_url, adapter=None):
         super(IncommingChannel, self).__init__(name, to_url)
         self.adapter = adapter
         self.close_event = Event()
-    
+
     def disconnect(self):
         self.adapter.close(code=1000, reason="client-closing")
         # TODO: Wait to actually close
         self.close_event.wait()
-    
+
     def notify_close(self):
         self.close_event.set()
-    
+
     def send(self, data):
         if self.status is Channel.OPEN:
             self.adapter.send(payload=data)
@@ -133,13 +134,13 @@ class IncommingChannel(Channel):
 
 
 class IncomingChannelWSAdapter(WebSocket):
-    
+
     def __init__(self, protocol):
         WebSocket.__init__(self, protocol)
-        self.server = None 
+        self.server = None
         self.log = logging.getLogger(self.__class__.__name__)
         self.channel = None
-    
+
     def opened(self):
         self.server = self.proto.server
         try:
@@ -152,12 +153,12 @@ class IncomingChannelWSAdapter(WebSocket):
         except Exception as e:
             logging.exception(e)
             raise e
-    
+
     def closed(self, code, reason=None):
         self.log.debug('closing ws. code=%s, reason=%s'%(str(code),str(reason)))
         self.channel.notify_close()
         self.server.on_channel_closed(self.channel)
-    
+
     def received_message(self, message):
         #print(' -> %s' % str(message))
         #print('Message is text %s - data[%s]' % (message.is_text,message.data))
@@ -187,7 +188,7 @@ class IncomingChannelWSAdapter(WebSocket):
             if len(self._peer_address) == 4:
                 self._peer_address = self._peer_address[:2]
         return self._peer_address
-    
+
 
 from ws4py.server.tulipserver import WebSocketProtocol
 
@@ -203,7 +204,7 @@ import asyncio
 
 
 class AsyncIOWebSocketServer:
-    
+
     def __init__(self, host='', port=1700, web_socket_class=IncomingChannelWSAdapter):
         self.host = host
         self.port = port
@@ -215,7 +216,7 @@ class AsyncIOWebSocketServer:
         self.aio_sf = None
         self.server_address = None
         self.log = logging.getLogger('AsyncIOWebSocketServer')
-        
+
     def start(self):
         proto = lambda: ServerAwareWebSocketProtocol(self.web_socket_class, self)
         asyncio.set_event_loop(self.aio_loop)
@@ -227,63 +228,63 @@ class AsyncIOWebSocketServer:
         self.aio_loop.run_forever()
         self.aio_loop.close()
         self.log.debug('Async Event loop closed.')
-        
-        
+
+
     def stop(self):
         def stop_server_and_loop():
             self.aio_sf.close()
             self.aio_loop.stop()
             self.log.debug('Server closed. Event loop notified for stop.')
         self.aio_loop.call_soon_threadsafe(stop_server_and_loop)
-        
+
     def on_channel_open(self, channel):
         self.channels[channel.name] = channel
         self.log.debug('Channel %s => %s added' % (channel.name, channel))
         self.notify_event('channel.open', channel)
-    
+
     def on_channel_closed(self, channel):
         del self.channels[channel]
         self.notify_event('channel.closed', channel)
-    
+
     def on_event(self, callback):
         self.listeners.append(callback)
-    
+
     def notify_event(self, event, channel):
         for listener in self.listeners:
             listener(event, channel)
-    
+
     def get_server_endpoint(self):
-        return 'ws://%s:%s' % (self.host, self.port)
+        return 'ws://%s:%s' % (self.host or 'localhost', self.port)
 # -- outgoing connection
 
 from ws4py.client.threadedclient import WebSocketClient
 
 
 class OutgoingChannelWSAdapter(WebSocketClient):
-    
+
     def __init__(self, url, handlers):
         super(OutgoingChannelWSAdapter, self).__init__(url=url)
         self.handlers = handlers
-    
+
     def __noop__(self, *args, **kwargs):
         pass
-    
+
     def __handler__(self, name):
         return self.handlers.get(name) or self.__noop__
-    
+
     def opened(self):
         self.__handler__('opened')()
-    
+
     def closed(self, code, reason=None):
         self.__handler__('closed')(code, reason)
-    
+
     def received_message(self, m):
         if m and m.data:
             self.__handler__('on_data')(m.data)
 
 
 class OutgoingChannelOverWS(Channel):
-    
+
     def __init__(self, name, to_url):
         super(OutgoingChannelOverWS, self).__init__(name, to_url)
         self.web_socket = OutgoingChannelWSAdapter(url=to_url,
@@ -292,32 +293,32 @@ class OutgoingChannelOverWS(Channel):
                 'closed': self._on_closed_handler_,
                 'on_data': self.data_received
            })
-    
+
     def _on_open_handler_(self):
         self.trigger('open', self)
         self.on_opened()
-    
+
     def on_opened(self):
         pass
-    
+
     def _on_closed_handler_(self, code, reason=None):
         self.trigger('closed', self, code, reason)
         self.on_closed(code, reason)
-    
+
     def on_closed(self, code, reason=None):
         pass
-    
+
     def connect(self):
         self.web_socket.connect()
-    
+
     def disconnect(self):
         self.web_socket.close()
-    
+
     def send(self, data):
         self.web_socket.send(payload=data)
 
 class ChannelManager(Observable):
-    
+
     def __init__(self, aio_server):
         #self.config = config
         super(ChannelManager, self).__init__()
@@ -326,8 +327,8 @@ class ChannelManager(Observable):
         self.by_url = {}
         self.log = logging.getLogger('channel-manager')
         self.aio_server.on_event(self._aio_server_event_)
-        
-        
+
+
     def _aio_server_event_(self, event, channel):
         if event == 'channel.open':
             self._on_open_channel_(channel)
@@ -335,8 +336,8 @@ class ChannelManager(Observable):
             pass
         else:
             pass
-        
-    
+
+
     def channel(self, name=None, to_url=None):
         if self.channels.get(name):
             return self.channels[name]
@@ -350,72 +351,72 @@ class ChannelManager(Observable):
         self.channels[name] = channel
         self.by_url[to_url] = channel
         return channel
-    
+
     def open_channel_to(self, name, url):
         och = OutgoingChannelOverWS(name=name, to_url=url)
         self._on_open_channel_(och)
         och.open()
         return och
-    
+
     def close_channel(self, name=None, endpoint=None):
         pass
-    
+
     def _on_open_channel_(self, channel):
         channel.on('closed', self._handle_closed_channel_)
-        
+
         def get_data_listener(channel):
             def data_listener(data):
                 self.trigger('channel.data', data, channel)
             return data_listener
-        
+
         channel.register_listener(get_data_listener(channel))
-        
+
         self.trigger('channel.open', channel)
-    
+
     def _handle_closed_channel_(self, channel, code, reason=None):
         del self.channels[channel.name]
         del self.by_url[channel.endpoint]
         self.trigger('channel.close', channel)
-    
+
     def listen(self, name=None, to_url=None, listener=None):
         channel = self.channel(name, to_url)
         channel.register_listener(listener)
-    
+
     def send(self, name=None, to_url=None, data=None):
         channel = self.channel(name, to_url)
         channel.send(data)
         #print('FIXME: Actual send')
-        
+
     def on_data(self, callback, from_channel=None):
         def actual_callback_no_filter(data, channel):
             callback(data)
-        
+
         def actual_callback_with_filter(data, channel):
             if channel.name == from_channel:
                 callback(data)
-        
+
         if from_channel:
             self.on('channel.data', actual_callback_with_filter)
         else:
             self.on('channel.data', actual_callback_no_filter)
-        
-            
+
+
 
 
 # -- simlest message bus in the world
 
 class MessageHandler:
-    
+
     def __init__(self, handler, message_filter):
         self.handler = handler
         self.message_filter = message_filter
-    
+
     def __call__(self, message):
         if self.message_filter:
             if not self.message_filter(message):
                 return
         self.handler(message)
-    
+
     def __eq__(self, other):
         if not type(self) is type(other):
             return False
@@ -428,17 +429,17 @@ class MessageHandler:
                 return self.message_filter.__eq__(other.message_filter)
             else:
                 return not other.message_filter
-    
+
     def __hash__(self):
         return self.handler.__hash__()
 
 
 class MessageBus:
-    
+
     def __init__(self):
         self.subscribers = {}
         self.log = logging.getLogger(self.__class__.__name__)
-    
+
     def on(self, topic, handler, message_filter=None):
         if not handler:
             raise Exception('Handler not specified')
@@ -449,14 +450,14 @@ class MessageBus:
             raise Exception('Handler already registered')
         self.log.debug('Listening on topic %s. Handler %s (filter=%s)', topic, handler, message_filter)
         subscribers.append(handler)
-    
+
     def __get_subscribers__(self, topic):
         subscribers = self.subscribers.get(topic)
         if not subscribers:
             subscribers = []
             self.subscribers[topic] = subscribers
         return subscribers
-    
+
     def publish(self, topic, event):
         subscribers = self.subscribers.get(topic)
         if subscribers:
@@ -465,14 +466,14 @@ class MessageBus:
                     handler(event)
                 except Exception as e:
                     self.log.exception(e)
-    
-    
+
+
     def remove(self, topic, handler):
         subscribers = self.subscribers.get(topic)
         if subscribers:
             subscribers.remove(handler)
-    
-    
+
+
 
 message_bus = MessageBus()
 
@@ -483,18 +484,15 @@ class Subscribe:
         self.bus = bus
         if not self.bus:
             self.bus = message_bus
-    
+
     def __call__(self, method):
         self.bus.on(self.topic, method)
         return method
 
 
 class Bus:
-    
+
     def __init__(self):
         self.subscribe = Subscribe
-        
+
 bus = Bus()
-
-
-
