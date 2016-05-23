@@ -6,6 +6,7 @@ from types import FunctionType
 from types import MethodType
 from troup.observer import Observable
 import logging
+from queue import Queue
 
 
 class ChannelError(Exception):
@@ -284,8 +285,8 @@ class OutgoingChannelWSAdapter(WebSocketClient):
 
 
 class OutgoingChannelOverWS(Channel):
-
-    def __init__(self, name, to_url):
+    
+    def __init__(self, name, to_url, early_messages='queue', queue_max_size=1000):
         super(OutgoingChannelOverWS, self).__init__(name, to_url)
         self.web_socket = OutgoingChannelWSAdapter(url=to_url,
            handlers={
@@ -293,9 +294,25 @@ class OutgoingChannelOverWS(Channel):
                 'closed': self._on_closed_handler_,
                 'on_data': self.data_received
            })
-
+        self._early_messages = early_messages
+        self._queue_max_size = queue_max_size
+        self.queue = None
+        self.__setup_early_strategy()
+        
+    def __setup_early_strategy(self):
+        if self._early_messages == 'queue':
+            self.queue = Queue(maxsize=self._queue_max_size)
+    
+    def __handle_early_messages(self):
+        if self._early_messages == 'queue':
+            while not self.queue.empty():
+                msg = self.queue.get_nowait()
+                self.send(msg)
+                
+    
     def _on_open_handler_(self):
         self.trigger('open', self)
+        self.__handle_early_messages()
         self.on_opened()
 
     def on_opened(self):
@@ -315,7 +332,21 @@ class OutgoingChannelOverWS(Channel):
         self.web_socket.close()
 
     def send(self, data):
-        self.web_socket.send(payload=data)
+        if self.status == Channel.OPEN:
+            self.web_socket.send(payload=data)
+        elif self.status in [Channel.CREATED, Channel.CONNECTING]:
+            self.__send_early(data)
+        else:
+            raise Exception('Cannot send: invalid channel status')
+    
+    def __send_early(self, data):
+        if self._early_messages == 'queue':
+            self.queue.put(data)
+        elif self._early_messages == 'reject':
+            raise Exception('Early message rejected')
+        else:
+            logging.warn('Early message [%s] not send due to unknow early messages strategy: %s' % (str(data), self._early_messages))
+            
 
 class ChannelManager(Observable):
 

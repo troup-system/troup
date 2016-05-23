@@ -66,7 +66,7 @@ class ChannelClient:
     def send_message_to_node(self, message, node, on_reply):
         channel = self.get_channel(node)
         channel.send(message)
-
+        print('Send message %s' % message)
 
     def get_channel(self, for_node):
         channel = self.channels.get(for_node)
@@ -87,9 +87,11 @@ class ChannelClient:
         chn =  OutgoingChannelOverWS(node_name, reference)
         chn.on('open', opened)
         chn.open()
-        import time
-        time.sleep(2)
         return chn
+    
+    def shutdown(self):
+        for name, channel in self.channels.items():
+            channel.close()
 
 
 def client_to_local_node():
@@ -111,4 +113,7 @@ class CommandAPI:
         pass
 
     def command(self, name, data):
-        return message(data=data).header('type', 'command').build()
+        return message(data=data).value('type', 'command').build()
+    
+    def shutdown(self):
+        self.channel_client.shutdown()
