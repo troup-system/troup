@@ -81,17 +81,15 @@ class ChannelClient:
         return self.create_channel(for_node, ref)
 
     def create_channel(self, node_name, reference):
-        def opened(*args):
-            print('OPENED')
-
-        chn =  OutgoingChannelOverWS(node_name, reference)
-        chn.on('open', opened)
+        chn = OutgoingChannelOverWS(node_name, reference)
         chn.open()
+        self.channels[node_name] = chn
         return chn
     
     def shutdown(self):
         for name, channel in self.channels.items():
             channel.close()
+        self.maintenance_timer.cancel()
 
 
 def client_to_local_node():
