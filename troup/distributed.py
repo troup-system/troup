@@ -33,5 +33,5 @@ class Promise:
 class DistributedException(Exception):
 
     def __init__(self, message, data=None):
-        super(DistributeException, self).__init__(message)
+        super(DistributedException, self).__init__(message)
         self.data = data

@@ -8,6 +8,7 @@ from os import path, getpid, remove
 import json
 import logging
 
+
 class Process:
 
     def __init__(self, id, name, args=None):
@@ -42,6 +43,7 @@ class LocalProcess(Process):
         if self.process:
             self.process.wait()
 
+
 class SSHRemoteProcess(LocalProcess):
     def __init__(self, id, name, args=None, cwd=None, forward_video=False, forward_audio=False,  compress_stream=False, target_host=None, target_port="22", ssh_user=''):
         self.forward_video = forward_video
@@ -69,8 +71,7 @@ class SSHRemoteProcess(LocalProcess):
         if not self.ssh_user:
             raise Exception('No ssh user defined')
 
-        return args + [ '-f', '-p', self.target_port, '%s@%s'%(self.ssh_user, self.target_host)]
-
+        return args + ['-f', '-p', self.target_port, '%s@%s' % (self.ssh_user, self.target_host)]
 
 
 class RemoteProcess(Process):
@@ -95,7 +96,6 @@ class LockFile:
         self.file.seek(0)
         self.file.write(self._content)
         self.file.flush()
-        print('__write_content -> %s' % self._content)
 
     def __open(self):
         if not self.exists():
@@ -173,6 +173,7 @@ def this_process_info_file(path, info=None, create=False):
         if not create:
             raise e
         return ProcessInfoFile(path=path, pid=pid, create=True, with_info=info)
+
 
 def open_process_lock_file(path, read_only=False):
     try:

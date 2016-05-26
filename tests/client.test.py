@@ -6,7 +6,12 @@ from troup.client import CommandAPI, client_to_local_node
 
 cmd = CommandAPI(channel_client=client_to_local_node())
 
-cmd.send_command(cmd.command('test', {}))
+promise = cmd.send_command(cmd.command('test', {}))
+print(promise)
 print('cmd send')
-cmd.shutdown()
-print('done')
+try:
+    result = promise.result
+    print('Result -> %s' % str(result))
+finally:
+    cmd.shutdown()
+    print('done')

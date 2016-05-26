@@ -155,7 +155,6 @@ class IncomingChannelWSAdapter(WebSocket):
                 adapter=self)
             self.channel.open()
             self.server.on_channel_open(self.channel)
-            print('Channel opened -> %s' % self.channel)
         except Exception as e:
             logging.exception(e)
             raise e
@@ -286,7 +285,10 @@ class OutgoingChannelWSAdapter(WebSocketClient):
 
     def received_message(self, m):
         if m and m.data:
-            self.__handler__('on_data')(m.data)
+            if m.is_text:
+                self.__handler__('on_data')(str(m))
+            else:
+                self.__handler__('on_data')(m.data)
 
 
 class OutgoingChannelOverWS(Channel):
@@ -488,15 +490,14 @@ class MessageBus:
             self.subscribers[topic] = subscribers
         return subscribers
 
-    def publish(self, topic, event):
+    def publish(self, topic, *events):
         subscribers = self.subscribers.get(topic)
         if subscribers:
             for handler in subscribers:
                 try:
-                    handler(event)
+                    handler(*events)
                 except Exception as e:
                     self.log.exception(e)
-
 
     def remove(self, topic, handler):
         subscribers = self.subscribers.get(topic)

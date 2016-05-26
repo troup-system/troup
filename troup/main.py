@@ -21,7 +21,9 @@ def configure_node_parser():
     parser.add_argument('--stats-update-interval', default=30000, help='Statistics update interval in milliseconds')
     
     parser.add_argument('--log-level', '-l', default='info', help='Logging level')
-    
+
+    parser.add_argument('--lock', action='store_true', help='Write node info in global lock file')
+
     parser.add_argument('-v', '--version', action='store_true', help='Print version and exit')
     
     return parser
@@ -51,7 +53,8 @@ def run_node():
         'stats': {
             'update_interval': args.stats_update_interval
         },
-        'neighbours': args.neighbours
+        'neighbours': args.neighbours,
+        'lock': args.lock
     }
     node = Node(node_id=args.node, config=config)
     

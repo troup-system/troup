@@ -55,7 +55,6 @@ class StatsTracker:
     
     def refresh_values(self):
         cpu_usage = psutil.cpu_percent(percpu=True)
-        print('cpu_usage=%s'%cpu_usage)
         self.cpu_usage = [usage/100 for usage in cpu_usage]
     
     def get_stats(self):
@@ -114,6 +113,4 @@ if __name__ == '__main__':
     while(True):
         s = tracker.get_stats()
         print(json.dumps(s.__dict__, indent=2))
-        
         time.sleep(1)
-    

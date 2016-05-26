@@ -11,6 +11,7 @@ from troup.process import this_process_info_file, open_process_lock_file, open_p
 import random
 from math import ceil
 from os import getpid
+import logging
 
 
 class Node:
@@ -26,6 +27,7 @@ class Node:
         self.bus = message_bus
         self.lock = None
         self.pid = getpid()
+        self.commands = {}
 
     def __lock(self):
         if self.lock:
@@ -59,9 +61,9 @@ class Node:
             try:
                 msg = deserialize(message_str)
                 if msg.headers.get('type'):
-                    self.bus.publish(msg.headers['type'], msg)
+                    self.bus.publish(msg.headers['type'], msg, channel)
                 else:
-                    self.bus.publish('__message.genericType', msg)
+                    self.bus.publish('__message.genericType', msg, channel)
             except Exception as e:
                 self.log.exception('Failed to handle channel data', e)
         self.channel_manager.on('channel.data', on_channel_data)
@@ -87,17 +89,42 @@ class Node:
                 print('Added neighbour %s [%s]' % (name, endpoint))
 
     def __register_to_local(self):
-        endpoint = self.aio_server.get_server_endpoint()
-        self.lock.set_info('url', endpoint)
+        if self.config.get('lock'):
+            endpoint = self.aio_server.get_server_endpoint()
+            self.lock.set_info('url', endpoint)
 
     def __register_command_handlers(self):
         @bus.subscribe('task')
-        def __on_task__(task):
+        def __on_task__(task, inc_channel):
             print('Received task: %s' % task)
 
         @bus.subscribe('command')
-        def __on_command__(command):
-            print('Received command: %s' % command)
+        def __on_command__(command, inc_channel):
+            print('Received command: %s over channel %s' % (command, inc_channel))
+            self.__process_command(command, inc_channel)
+
+    def __register_commands(self):
+        pass
+
+    def __process_command(self, command, channel):
+        handler = self.commands.get(command.headers['command'])
+        if not handler:
+            self.__reply_to_command(command, reply='Unknown command', error=True, channel=channel)
+            return
+        try:
+            reply = handler(command)
+            self.__reply_to_command(command, reply=reply, channel=channel)
+        except Exception as e:
+            self.__reply_to_command(command, reply=e.message, error=True, channel=channel)
+            logging.exception('Failed to execute command %s', command)
+
+    def __reply_to_command(self, command, reply, channel, error=None):
+        reply_msg = message().header('reply-for-command', command.id).\
+            header('type', 'command-reply').\
+            value('error', error).value('reply', reply).build()
+        ser_msg = serialize(reply_msg)
+        channel.send(ser_msg)
+        print('Replied -> %s' % ser_msg)
 
     def get_available_apps(self):
         return [app.name for app in self.store.apps]
@@ -115,7 +142,8 @@ class Node:
         pass
 
     def start(self):
-        self.__lock()
+        if self.config.get('lock'):
+            self.__lock()
         self.channel_manager = self._start_channel_manager_()
         print('Node %s started' % self.node_id)
         self._start_stats_tracker_()
@@ -134,7 +162,8 @@ class Node:
             print('Async I/O Server notified to stop')
         if self.sync_manager:
             self.sync_manager.stop()
-        self.lock.unlock()
+        if self.lock:
+            self.lock.unlock()
 
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
@@ -146,24 +175,6 @@ class NodeInfo:
         self.stats = stats
         self.apps = apps
         self.endpoint = endpoint
-
-
-class EventProcessor:
-    def __init__(self, node):
-        self.node = node
-        self.handlers = {}
-
-    def process(self, event, message):
-        handlers = self.handlers.get(event)
-        if handlers:
-            for handler in handlers:
-                handler(message, event, self)
-
-    def register_handler(self, event_name, handler):
-        handlers = self.handlers.get(event_name)
-        if not handlers:
-            handlers = self.handlers[event_name] = []
-        handlers.append(handler)
 
 
 def node_info_from_dict(node_dict):
@@ -184,7 +195,6 @@ class RandomBuffer:
         self.nodes_dict = nodes_dict
         self.buffer = []
         self._shuffle_()
-
 
     def next(self, n):
         n = int(ceil(n))
@@ -214,7 +224,7 @@ class SyncManager:
     def _on_message_(self, msg_str, channel):
         msg = deserialize(msg_str, as_type=Message)
         #print('Got message [%s]' % msg.__dict__)
-        if msg.data.get('type') == 'sync-message':
+        if msg.headers.get('type') == 'sync-message':
             self._on_sync_message_(msg)
 
     def _on_sync_message_(self, msg):
@@ -239,7 +249,7 @@ class SyncManager:
     def _print_known_nodes_(self):
         print(' Members: ')
         for name, node in self.known_nodes.items():
-            print('   %s[%s]' %(name, node.endpoint) )
+            print('   %s[%s]' % (name, node.endpoint))
 
     def _merge_node_(self, node):
         existing = self.known_nodes[node.name]
