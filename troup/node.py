@@ -29,6 +29,8 @@ class Node:
         self.pid = getpid()
         self.commands = {}
 
+        self.__register_commands()
+
     def __lock(self):
         if self.lock:
             return self.lock
@@ -104,7 +106,17 @@ class Node:
             self.__process_command(command, inc_channel)
 
     def __register_commands(self):
-        pass
+        self.command_handler('apps', self.__list_apps)
+        self.command_handler('info', self.__get_info)
+
+    def __list_apps(self, command):
+        return self.get_available_apps()
+
+    def __get_info(self, command):
+        return self.get_node_info()
+
+    def command_handler(self, command, handler):
+        self.commands[command] = handler
 
     def __process_command(self, command, channel):
         handler = self.commands.get(command.headers['command'])

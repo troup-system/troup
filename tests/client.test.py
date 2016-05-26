@@ -6,7 +6,7 @@ from troup.client import CommandAPI, client_to_local_node
 
 cmd = CommandAPI(channel_client=client_to_local_node())
 
-promise = cmd.send_command(cmd.command('test', {}))
+promise = cmd.send_command(cmd.command('info', {}))
 print(promise)
 print('cmd send')
 try:
