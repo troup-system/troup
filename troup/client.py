@@ -4,8 +4,8 @@ from troup.threading import IntervalTimer
 from troup.node import read_local_node_lock
 from troup.messaging import message, serialize, deserialize
 
-
 from datetime import datetime, timedelta
+
 
 class CallbackWrapper:
     def __init__(self, callback, valid_for, promise=None, created_on=None):
@@ -17,6 +17,7 @@ class CallbackWrapper:
     def check_expired(self):
         if datetime.now() > (timedelta(milliseconds=self.valid_for) + self.created_on):
             self.promise.complete(error='Timeout', result=Exception('Timeout'))
+
     def execute_callback(self, result):
         if self.callback:
             try:
@@ -25,8 +26,8 @@ class CallbackWrapper:
                 print('Woops')
         self.promise.complete(result=result)
 
-class ChannelClient:
 
+class ChannelClient:
     def __init__(self, nodes_specs=None, reply_timeout=5000, check_interval=5000):
         self.nodes_ref = {}
         self.channels = {}
@@ -42,7 +43,8 @@ class ChannelClient:
             self.nodes_ref[parsed[0]] = parsed[2]
 
     def __build_timer(self):
-        timer = IntervalTimer(interval=self.check_interval, offset=self.check_interval, target=self.__check_expired_callbacks)
+        timer = IntervalTimer(interval=self.check_interval, offset=self.check_interval,
+                              target=self.__check_expired_callbacks)
         timer.start()
         return timer
 
@@ -85,7 +87,7 @@ class ChannelClient:
         chn.open()
         self.channels[node_name] = chn
         return chn
-    
+
     def shutdown(self):
         for name, channel in self.channels.items():
             channel.close()
@@ -93,14 +95,12 @@ class ChannelClient:
 
 
 def client_to_local_node():
-
     lock = read_local_node_lock()
-    client = ChannelClient(nodes_specs=['%s:%s'%(lock.get_info('name'), lock.get_info('url'))])
+    client = ChannelClient(nodes_specs=['%s:%s' % (lock.get_info('name'), lock.get_info('url'))])
     return client
 
 
 class CommandAPI:
-
     def __init__(self, channel_client):
         self.channel_client = channel_client
 
@@ -111,7 +111,7 @@ class CommandAPI:
         pass
 
     def command(self, name, data):
-        return message(data=data).value('type', 'command').build()
-    
+        return message(data=data).header('type', 'command').build()
+
     def shutdown(self):
         self.channel_client.shutdown()

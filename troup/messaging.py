@@ -64,7 +64,7 @@ def deserialize(smsg, as_type=None, strict=False):
         if hasattr(msg, name):
             setattr(msg, name, value)
         elif strict:
-            raise Error('No such property %s' % name)
+            raise Exception('No such property %s' % name)
     
     return msg 
 
@@ -76,7 +76,7 @@ def deserialize_dict(dval, as_type, strict=None):
         if hasattr(val, name):
             setattr(val, name, value)
         elif strict:
-            raise Error('No such property %s' % name)
+            raise Exception('No such property %s' % name)
     
     return val
 

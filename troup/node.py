@@ -36,9 +36,10 @@ class Node:
 
     def __check_lock(self):
         lock = check_local_node_lock()
-        if lock:
-            if lock.pid != self.pid:
-                raise Excepion('Seems there is a node already running. PID is %d. If no node with this pid is running, then you may have to delete the file manually.' % lock.pid)
+        if lock and lock.pid != self.pid:
+            raise Exception('Seems there is a node already running. PID is %d. ' +
+                            'If no node with this pid is running, then you may ' +
+                            'have to delete the file manually.' % lock.pid)
 
     def _start_channel_manager_(self):
         aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
@@ -57,8 +58,8 @@ class Node:
         def on_channel_data(message_str, channel):
             try:
                 msg = deserialize(message_str)
-                if msg.data.get('type'):
-                    self.bus.publish(msg.data['type'], msg)
+                if msg.headers.get('type'):
+                    self.bus.publish(msg.headers['type'], msg)
                 else:
                     self.bus.publish('__message.genericType', msg)
             except Exception as e:
@@ -89,6 +90,15 @@ class Node:
         endpoint = self.aio_server.get_server_endpoint()
         self.lock.set_info('url', endpoint)
 
+    def __register_command_handlers(self):
+        @bus.subscribe('task')
+        def __on_task__(task):
+            print('Received task: %s' % task)
+
+        @bus.subscribe('command')
+        def __on_command__(command):
+            print('Received command: %s' % command)
+
     def get_available_apps(self):
         return [app.name for app in self.store.apps]
 
@@ -112,6 +122,7 @@ class Node:
         self._start_sync_manager_()
         self.__register_message_dispatcher__()
         self.__register_to_local()
+        self.__register_command_handlers()
 
     def stop(self):
         print('node stop')
@@ -128,13 +139,6 @@ class Node:
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
 
-    @bus.subscribe('task')
-    def __on_task__(self, task):
-        print('Received task: %s' % task)
-
-    @bus.subscribe('command')
-    def __on_command__(self, command):
-        print('Received command: %s' % command)
 
 class NodeInfo:
     def __init__(self, name=None, stats=None, apps=None, endpoint=None):
@@ -142,6 +146,7 @@ class NodeInfo:
         self.stats = stats
         self.apps = apps
         self.endpoint = endpoint
+
 
 class EventProcessor:
     def __init__(self, node):

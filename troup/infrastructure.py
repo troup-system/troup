@@ -91,6 +91,10 @@ class Channel:
                 except Exception as e:
                     self.log.debug('An error while triggering event {}', event, e)
 
+    def __repr__(self):
+        return '<Channel %s> to %s' % (self.name, self.to_url)
+
+
 class ListenerWrapper:
     def __init__(self, delegate):
         self.delegate = self.__get_callable__(delegate)
@@ -151,6 +155,7 @@ class IncomingChannelWSAdapter(WebSocket):
                 adapter=self)
             self.channel.open()
             self.server.on_channel_open(self.channel)
+            print('Channel opened -> %s' % self.channel)
         except Exception as e:
             logging.exception(e)
             raise e
@@ -359,7 +364,6 @@ class ChannelManager(Observable):
         self.log = logging.getLogger('channel-manager')
         self.aio_server.on_event(self._aio_server_event_)
 
-
     def _aio_server_event_(self, event, channel):
         if event == 'channel.open':
             self._on_open_channel_(channel)
@@ -367,7 +371,6 @@ class ChannelManager(Observable):
             pass
         else:
             pass
-
 
     def channel(self, name=None, to_url=None):
         if self.channels.get(name):
@@ -416,7 +419,6 @@ class ChannelManager(Observable):
     def send(self, name=None, to_url=None, data=None):
         channel = self.channel(name, to_url)
         channel.send(data)
-        #print('FIXME: Actual send')
 
     def on_data(self, callback, from_channel=None):
         def actual_callback_no_filter(data, channel):
@@ -432,10 +434,7 @@ class ChannelManager(Observable):
             self.on('channel.data', actual_callback_no_filter)
 
 
-
-
-# -- simlest message bus in the world
-
+# -- simplest message bus in the world
 class MessageHandler:
 
     def __init__(self, handler, message_filter):
