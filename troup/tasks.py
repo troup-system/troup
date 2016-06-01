@@ -1,5 +1,8 @@
+
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
+
+from troup.process import LocalProcess, SSHRemoteProcess
 
 
 class TaskException(Exception):
@@ -168,7 +171,67 @@ class FunctionBytecodeTask(CodeTask):
         self.function = None
         
     def __build_function(self, fn_locals, fn_globals):
+        #FunctionType()
         pass
 
     def exec(self, fn_locals, fn_globals):
-        self.function = self.__build_function()
+        #self.function = self.__build_function()
+        pass
+
+
+class ProcessTaskException(TaskException):
+    pass
+
+
+class LocalProcessTask(Task):
+
+    def __LocalProcessBuilder(self, id, data):
+
+        executable = data['executable']
+        args = data['args']
+        cwd = data.get('directory')
+
+        process = LocalProcess(id=id, name=executable, args=args, cwd=cwd)
+
+        return process
+
+    def __SSHProcessBuilder(self, id, data):
+        executable = data['executable']
+        host = data['host']
+        port = data.get('port', '22')
+        cwd = data.get('directory')
+        forward_video = data.get('forward_video', False)
+        forward_audio = data.get('forward_audio', False)
+        compress_stream = data.get('compress_stream', False)
+        ssh_user = data.get('ssh_user', '')
+
+        process = SSHRemoteProcess(id=id, name=executable, cwd=cwd, target_host=host, target_port=port,
+                                   forward_video=forward_video, forward_audio=forward_audio,
+                                   compress_stream=compress_stream, ssh_user=ssh_user)
+
+        return process
+
+    PROCESS_BUILDERS = {
+        'LocalProcess': __LocalProcessBuilder,
+        'SSHProcess': __SSHProcessBuilder
+    }
+
+    def __init__(self, process_type, process_data, task_id=None):
+        super(LocalProcessTask, self).__init__(task_id=task_id)
+        self.process = None
+        self.__build_process(process_type, process_data)
+
+    def __build_process(self, process_type, process_data):
+        builder = LocalProcessTask.PROCESS_BUILDERS.get(process_type)
+        if not builder:
+            raise ProcessTaskException('Unsupported process type %s' % process_type)
+        try:
+            self.process = builder(self.id, process_data)
+        except Exception as e:
+            raise ProcessTaskException('Failed to build process of type %s' % process_type) from e
+
+    def run(self, context=None):
+        self.process.execute()
+        
+    def stop(self, reason=None):
+        self.process.kill()

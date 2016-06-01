@@ -43,9 +43,13 @@ class LocalProcess(Process):
         if self.process:
             self.process.wait()
 
+    def kill(self):
+        self.process.kill()
+
 
 class SSHRemoteProcess(LocalProcess):
-    def __init__(self, id, name, args=None, cwd=None, forward_video=False, forward_audio=False,  compress_stream=False, target_host=None, target_port="22", ssh_user=''):
+    def __init__(self, id, name, args=None, cwd=None, forward_video=False, forward_audio=False,
+                 compress_stream=False, target_host=None, target_port="22", ssh_user=''):
         self.forward_video = forward_video
         self.forward_audio = forward_audio
         self.compress_stream = compress_stream
