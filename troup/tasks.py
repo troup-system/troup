@@ -18,16 +18,18 @@ class TaskRun:
     DONE = 'DONE'
     ERROR = 'ERROR'
     
-    def __init__(self, task):
+    def __init__(self, task, future=None):
         self.task = task
         self.status = TaskRun.CREATED
         self.result = None
         self.error = None
+        self.future = future
         
     def start(self):
         if self.status is not TaskRun.CREATED:
             raise TaskRunException('Failed to start task: invalid Status %s' % self.status)
         try:
+            self.status = TaskRun.RUNNING
             self.do_start()
             self.stop()
         except Exception as e:
@@ -36,7 +38,7 @@ class TaskRun:
 
     def stop(self, reason=None):
         if self.status is not TaskRun.RUNNING:
-            raise TaskRunException('Failed to start task: invalid Status %s' % self.status)
+            raise TaskRunException('Failed to stop task: invalid Status %s' % self.status)
         self.status = TaskRun.STOPPING
         try:
             self.do_stop(reason)
@@ -63,14 +65,18 @@ class TasksRunner:
             raise TaskRunException('Task already running %s' % str(task))
 
         def start_task():
-            pass
+            task.run()
 
-        def on_done():
-            pass
-
-        self.tasks[task.id] = task
+        def on_done(*args):
+            if self.tasks.get(task.id):
+                run = self.tasks[task.id]
+                run.result = run.future.result()
+                del self.tasks[task.id]
+        task_run = TaskRun(task=task)
+        self.tasks[task.id] = task_run
         try:
             future = self.executor.submit(start_task)
+            task_run.future = future
             future.add_done_callback(on_done)
             return future
         except Exception as e:
@@ -93,14 +99,28 @@ class TasksRunner:
 
 
 class Task:
-    def __init__(self, task_id):
+    def __init__(self, task_id=None):
         self.id = task_id or str(uuid4())
     
-    def run(self, context):
+    def run(self, context=None):
         pass
 
     def stop(self, reason=None):
         pass
+
+    def __repr__(self):
+        return '<%s.%s with id %s>' %(self.__class__.__module__, self.__class__.__name__, self.id)
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        if other is None:
+            return False
+        return type(self) == type(other) and self.id == other.id
+
+    def __hash__(self):
+        return self.id.__hash__()
 
 
 class CodeTask(Task):
