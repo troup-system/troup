@@ -3,7 +3,7 @@ import sys
 
 sys.path.append('/..')
 
-
+import time
 from troup.tasks import Task, TaskRun, TasksRunner
 
 
@@ -33,6 +33,21 @@ class TaskRunTest(unittest.TestCase):
         assert run.status is TaskRun.DONE
 
 
+class DelayedTestTask(Task):
+
+    def __init__(self, delay=1):
+        super(DelayedTestTask, self).__init__()
+        self.delay = delay
+
+    def run(self, context=None):
+        print('[%s] task sleeping for %f seconds' % (self.id, self.delay))
+        time.sleep(self.delay)
+        print('[%s] task done' % self.id)
+
+    def stop(self, reason=None):
+        print('[%s] done' % self.id)
+
+
 class TasksRunnerTest(unittest.TestCase):
 
     def setUp(self):
@@ -43,11 +58,17 @@ class TasksRunnerTest(unittest.TestCase):
 
     def test_start_task(self):
         task = DemoTask(task_id='task-demo-0')
-        future = self.runner.run(task)
-        assert future
+        run = self.runner.run(task)
+        assert run
 
     def test_stop_task(self):
-        pass
+        dt = DelayedTestTask()
+        run = self.runner.run(dt)
+        assert run
+        time.sleep(0.5)
+        assert run.status is TaskRun.RUNNING
+        self.runner.stop(dt.id, wait=True)
+        assert run.status is TaskRun.DONE
 
 if __name__ == '__main__':
     unittest.main()

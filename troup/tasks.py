@@ -31,7 +31,8 @@ class TaskRun:
         try:
             self.status = TaskRun.RUNNING
             self.do_start()
-            self.stop()
+            if self.status is TaskRun.RUNNING:
+                self.stop()
         except Exception as e:
             self.status = TaskRun.ERROR
             self.error = e
@@ -64,35 +65,40 @@ class TasksRunner:
         if self.tasks.get(task.id):
             raise TaskRunException('Task already running %s' % str(task))
 
+        task_run = TaskRun(task=task)
+        self.tasks[task.id] = task_run
+
         def start_task():
-            task.run()
+            task_run.start()
 
         def on_done(*args):
             if self.tasks.get(task.id):
                 run = self.tasks[task.id]
                 run.result = run.future.result()
                 del self.tasks[task.id]
-        task_run = TaskRun(task=task)
-        self.tasks[task.id] = task_run
+
         try:
             future = self.executor.submit(start_task)
             task_run.future = future
             future.add_done_callback(on_done)
-            return future
+            return task_run
         except Exception as e:
             del self.tasks[task.id]
             raise TaskRunException('Failed to schedule task run for %s' % str(task)) from e
 
-    def stop(self, task_id):
+    def stop(self, task_id, wait=False, timeout=None):
         if not self.tasks.get(task_id):
             raise TaskException('No task with id %s' % task_id)
         task = self.tasks[task_id]
         try:
             task.stop()
+            if wait:
+                task.future.result(timeout=timeout)
         except Exception as e:
             raise TaskException('Failed to stop task %s' % str(task)) from e
         finally:
-            del self.tasks[task_id]
+            if self.tasks.get(task_id):
+                del self.tasks[task_id]
 
     def shutdown(self):
         self.executor.shutdown(wait=True)
