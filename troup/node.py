@@ -7,7 +7,8 @@ from troup.messaging import message, serialize, deserialize, deserialize_dict, M
 import threading
 from troup.threading import IntervalTimer
 from troup.apps import App
-from troup.process import this_process_info_file, open_process_lock_file, open_process_lock_file
+from troup.process import this_process_info_file, open_process_lock_file
+from troup.tasks import TasksRunner, build_task
 import random
 from math import ceil
 from os import getpid
@@ -28,6 +29,7 @@ class Node:
         self.lock = None
         self.pid = getpid()
         self.commands = {}
+        self.runner = TasksRunner(max_workers=int(self.config.get('runner-max-workers', '3')))
 
         self.__register_commands()
 
@@ -98,7 +100,8 @@ class Node:
     def __register_command_handlers(self):
         @bus.subscribe('task')
         def __on_task__(task, inc_channel):
-            print('Received task: %s' % task)
+            self.runner.run(build_task(task))
+            # FIXME: Add context to runner.run and reply to task message (?)
 
         @bus.subscribe('command')
         def __on_command__(command, inc_channel):

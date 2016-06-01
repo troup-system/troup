@@ -232,6 +232,29 @@ class LocalProcessTask(Task):
 
     def run(self, context=None):
         self.process.execute()
-        
+
     def stop(self, reason=None):
         self.process.kill()
+
+
+def __local_process_task_from_message(msg):
+    process_type = msg.headers.get('process-type')
+    if not process_type:
+        raise ProcessTaskException('No process type specified')
+    process_data = msg.data['process']
+    task_id = msg.headers.get('task-id') or str(uuid4())
+    return LocalProcessTask(process_type=process_type, process_data=process_data, task_id=task_id)
+
+__TASK_BUILDERS = {
+    'local-process': __local_process_task_from_message
+}
+
+
+def build_task(msg):
+    task_type = msg.headers.get('task-type')
+    if not task_type:
+        raise TaskException('Task type missing')
+    builder = __TASK_BUILDERS.get(task_type)
+    if not builder:
+        raise TaskException('Cannot build task of type %s' % task_type)
+    return  builder(msg)
