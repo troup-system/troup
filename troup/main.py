@@ -24,6 +24,8 @@ def configure_node_parser():
 
     parser.add_argument('--lock', action='store_true', help='Write node info in global lock file')
 
+    parser.add_argument('--debug', action='store_true', help='Activate the debug command-line interactive interface')
+
     parser.add_argument('-v', '--version', action='store_true', help='Print version and exit')
     
     return parser
@@ -31,7 +33,6 @@ def configure_node_parser():
 
 def run_node():
     import signal
-    
     
     parser = configure_node_parser()
     args = parser.parse_args()
@@ -62,8 +63,11 @@ def run_node():
         node.stop()
     
     signal.signal(signal.SIGINT, handle_node_shutdown)
-    
+
+    if args.debug:
+        from troup.debug import run_debug_cli
+        run_debug_cli()
+
     node.start()
     
     return node
-    

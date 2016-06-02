@@ -179,6 +179,8 @@ class Node:
             self.sync_manager.stop()
         if self.lock:
             self.lock.unlock()
+        self.runner.shutdown()
+        print('Runner stopped')
 
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())

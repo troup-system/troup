@@ -3,7 +3,8 @@ from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
 from troup.process import LocalProcess, SSHRemoteProcess
-
+from troup.threading import IntervalTimer
+from datetime import datetime, timedelta
 
 class TaskException(Exception):
     pass
@@ -27,12 +28,15 @@ class TaskRun:
         self.result = None
         self.error = None
         self.future = future
-        
+        self.start_time = None
+        self.ttl = None
+
     def start(self):
         if self.status is not TaskRun.CREATED:
             raise TaskRunException('Failed to start task: invalid Status %s' % self.status)
         try:
             self.status = TaskRun.RUNNING
+            self.start_time = datetime.now()
             self.do_start()
             if self.status is TaskRun.RUNNING:
                 self.stop()
@@ -63,6 +67,13 @@ class TasksRunner:
     def __init__(self, max_workers=3):
         self.tasks = {}
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.checker = IntervalTimer(1000, offset=1000, target=self._check_tasks, name='TasksRunnerMaintenanceTimer')
+        self.checker.start()
+
+    def _check_tasks(self):
+        for id, task_run in self.tasks.items():
+            if task_run.status is TaskRun.DONE or task_run.status is TaskRun.ERROR:
+                self.__remove_task(task_run)
 
     def run(self, task):
         if self.tasks.get(task.id):
@@ -104,7 +115,46 @@ class TasksRunner:
                 del self.tasks[task_id]
 
     def shutdown(self):
+        self.checker.cancel()
         self.executor.shutdown(wait=True)
+
+    def __get_task(self, task_id):
+        task = self.tasks.get(task_id)
+        if not task:
+            raise TaskException('No task with id %s' % task_id)
+        return task
+
+    def __remove_task(self, task, force=False):
+        if force or not task.ttl:
+            del self.tasks[task.id]
+        elif task.ttl > 0:
+            td = datetime.now() - task.start_time
+            ttl = timedelta(microseconds=task.ttl*1000)
+            if td > ttl:
+                del self.tasks[task.id]
+
+    def clear(self, task_id):
+        task_run = self.__get_task(task_id)
+        if task_run is TaskRun.RUNNING:
+            raise TaskException('Task is running')
+        self.__remove_task(task=task_run, force=True)
+
+    @property
+    def stats(self):
+        result = {
+            'total': len(self.tasks)
+        }
+        running = 0
+        for id, run in self.tasks:
+            result[id] = {
+                'id': id,
+                'status': run.status,
+                'since': run.start_time
+            }
+            if run.status is TaskRun.RUNNING:
+                running += 1
+        result['running'] = running
+        return result
 
 
 class Task:
