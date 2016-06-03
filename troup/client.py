@@ -161,9 +161,10 @@ class CommandAPI:
     def command(name, data):
         return message(data=data).header('type', 'command').header('command', name).build()
 
-    def task(type, data, ttl=None):
+    def task(type, data, ttl=None, track_out=False, buffer=None):
         return message().header('type', 'task').header('ttl', ttl).\
             header('task-type', 'process').header('process-type', type).\
+            header('consume-out', track_out).header('buffer-size', buffer).\
             value('process', data).build()
 
     def shutdown(self):

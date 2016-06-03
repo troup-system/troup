@@ -13,7 +13,7 @@ promise = cmd.send(CommandAPI.task('LocalProcess', {
     'directory': '/home/pavle/projects',
     'executable': '/usr/bin/xterm',
     'args': []
-}))
+}, track_out=True))
 print(promise)
 print('cmd send')
 try:

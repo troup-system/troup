@@ -1,6 +1,10 @@
 
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
+from collections import deque
+import logging
+from functools import reduce
 
 from troup.process import LocalProcess, SSHRemoteProcess
 from troup.threading import IntervalTimer
@@ -270,10 +274,49 @@ class LocalProcessTask(Task):
         'SSHProcess': __SSHProcessBuilder
     }
 
-    def __init__(self, process_type, process_data, task_id=None, ttl=None):
+    def __init__(self, process_type, process_data, task_id=None, ttl=None,
+                 consume_process_out=False, buffer_size=100000):
         super(LocalProcessTask, self).__init__(task_id=task_id, ttl=ttl)
         self.process = None
         self.__build_process(process_type, process_data)
+        self.buffer_size = buffer_size
+        self.consume_process_out = consume_process_out
+
+        if self.consume_process_out:
+            self._setup_process_consumers()
+
+    def _setup_process_consumers(self):
+        self._out_buffer = deque(maxlen=self.buffer_size)
+        self._err_buffer = deque(maxlen=self.buffer_size)
+        self._out_consumer = Thread(target=self._consume_out, name='Consumer:OUT:%s' % self.id)
+        self._err_consumer = Thread(target=self._consume_err, name='Consumer:ERR:%s' % self.id)
+
+    def _consume_out(self):
+        try:
+            while self.process and self.process.output and not self.process.output.closed:
+                line = self.process.output.readline()
+                print('[OUT]%s' % line)
+                if not line:
+                    break
+                self._out_buffer.appendleft(line)
+        except:
+            logging.exception('Failed to read process output')
+
+    def _consume_err(self):
+        try:
+            while self.process and self.process.error and not self.process.error.closed:
+                line = self.process.error.readline()
+                print('[ERR]%s' % line)
+                if not line:
+                    break
+                self._out_buffer.appendleft(line)
+        except:
+            logging.exception('Failed to read process error')
+
+    def _run_consumers(self):
+        if self.consume_process_out:
+            self._out_consumer.start()
+            self._err_consumer.start()
 
     def __build_process(self, process_type, process_data):
         builder = LocalProcessTask.PROCESS_BUILDERS.get(process_type)
@@ -287,8 +330,25 @@ class LocalProcessTask(Task):
     def run(self, context=None):
         print('Executing process %s' % self.process)
         self.process.execute()
+        if self.consume_process_out:
+            self._run_consumers()
         print('Process started. Waiting...')
-        self.process.wait()
+        returncode = self.process.wait()
+        print('Process ended with code %d' % returncode)
+        try:
+            if returncode:
+                msg = self._handle_error(returncode)
+        finally:
+            self.process.close_streams()
+
+
+    def _handle_error(self, returncode):
+        message = 'code: %d' % returncode
+        if self.consume_process_out:
+            err_msg = reduce(lambda a, b: a+b, self._err_buffer, '')
+            message += err_msg
+
+        raise ProcessTaskException(message)
 
     def stop(self, reason=None):
         self.process.kill()
@@ -301,7 +361,10 @@ def __local_process_task_from_message(msg):
     process_data = msg.data['process']
     task_id = msg.headers.get('task-id') or str(uuid4())
     ttl = int(msg.headers.get('ttl') or 0)
-    return LocalProcessTask(process_type=process_type, process_data=process_data, task_id=task_id, ttl=ttl)
+    buffer_size = msg.headers.get('buffer-size')
+    consume_out = msg.headers.get('consume-out') or False
+    return LocalProcessTask(process_type=process_type, process_data=process_data, task_id=task_id,
+                            ttl=ttl, buffer_size=buffer_size, consume_process_out=consume_out)
 
 __TASK_BUILDERS = {
     'process': __local_process_task_from_message

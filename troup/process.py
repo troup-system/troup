@@ -22,6 +22,9 @@ class Process:
     def send_signal(self, signal):
         pass
 
+    def get_returncode(self):
+        pass
+
 
 class LocalProcess(Process):
 
@@ -41,10 +44,22 @@ class LocalProcess(Process):
 
     def wait(self):
         if self.process:
-            self.process.wait()
+            return self.process.wait()
+        return 0
 
     def kill(self):
         self.process.kill()
+
+    def close_streams(self):
+        self.input.close()
+        self.output.close()
+        self.error.close()
+        pass
+
+    def get_returncode(self):
+        if self.process:
+            return self.process.returncode
+        return 0
 
 
 class SSHRemoteProcess(LocalProcess):
@@ -82,7 +97,7 @@ class RemoteProcess(Process):
     pass
 
 
-# Proces lockfiles and IPC
+# Process lock-files and IPC
 
 class LockFile:
 
