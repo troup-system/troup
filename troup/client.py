@@ -60,11 +60,11 @@ class ChannelClient:
 
     def __on_channel_data(self, data, channel):
         msg = deserialize(data, Message)
-        if msg.headers.get('type') == 'command-reply':
+        if msg.headers.get('type') == 'reply':
             self.__process_reply(msg)
 
     def __process_reply(self, reply):
-        id = reply.headers.get('reply-for-command')
+        id = reply.headers.get('reply-for')
         if not id:
             raise Exception('Invalid reply %s' % reply)
         wrapper = self.callbacks.get(id)
@@ -152,14 +152,19 @@ class CommandAPI:
     def __init__(self, channel_client):
         self.channel_client = channel_client
 
-    def send_command(self, command, to_node=None, on_reply=None):
+    def send(self, command, to_node=None, on_reply=None):
         return self.channel_client.send_message(message=command, to_node=to_node, on_reply=on_reply)
 
     def monitor(self, command_ref):
         pass
 
-    def command(self, name, data):
+    def command(name, data):
         return message(data=data).header('type', 'command').header('command', name).build()
+
+    def task(type, data, ttl=None):
+        return message().header('type', 'task').header('ttl', ttl).\
+            header('task-type', 'process').header('process-type', type).\
+            value('process', data).build()
 
     def shutdown(self):
         self.channel_client.shutdown()

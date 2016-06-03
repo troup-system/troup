@@ -100,8 +100,13 @@ class Node:
     def __register_command_handlers(self):
         @bus.subscribe('task')
         def __on_task__(task, inc_channel):
-            self.runner.run(build_task(task))
-            # FIXME: Add context to runner.run and reply to task message (?)
+            try:
+                run = self.runner.run(build_task(task))
+                # FIXME: Add context to runner.
+                self.__reply(task, run.id, inc_channel)
+            except Exception as e:
+                logging.exception('Failed to run task %s', task)
+                self.__reply(task, str(e), inc_channel, error=True)
 
         @bus.subscribe('command')
         def __on_command__(command, inc_channel):
@@ -124,18 +129,18 @@ class Node:
     def __process_command(self, command, channel):
         handler = self.commands.get(command.headers['command'])
         if not handler:
-            self.__reply_to_command(command, reply='Unknown command', error=True, channel=channel)
+            self.__reply(command, reply='Unknown command', error=True, channel=channel)
             return
         try:
             reply = handler(command)
-            self.__reply_to_command(command, reply=reply, channel=channel)
+            self.__reply(command, reply=reply, channel=channel)
         except Exception as e:
-            self.__reply_to_command(command, reply=e.message, error=True, channel=channel)
+            self.__reply(command, reply=e.message, error=True, channel=channel)
             logging.exception('Failed to execute command %s', command)
 
-    def __reply_to_command(self, command, reply, channel, error=None):
-        reply_msg = message().header('reply-for-command', command.id).\
-            header('type', 'command-reply').\
+    def __reply(self, msg, reply, channel, error=None):
+        reply_msg = message().header('reply-for', msg.id).\
+            header('type', 'reply').\
             value('error', error).value('reply', reply).build()
         ser_msg = serialize(reply_msg)
         channel.send(ser_msg)

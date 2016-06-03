@@ -22,14 +22,15 @@ class TaskRun:
     DONE = 'DONE'
     ERROR = 'ERROR'
     
-    def __init__(self, task, future=None):
+    def __init__(self, task, future=None, run_id=None):
         self.task = task
         self.status = TaskRun.CREATED
         self.result = None
         self.error = None
         self.future = future
         self.start_time = None
-        self.ttl = None
+        self.ttl = task.ttl
+        self.id = run_id or task.id or str(uuid4())
 
     def start(self):
         if self.status is not TaskRun.CREATED:
@@ -83,7 +84,9 @@ class TasksRunner:
         self.tasks[task.id] = task_run
 
         def start_task():
+            print('Running task [%s]' % task_run.id)
             task_run.start()
+            print('Run and done - task [%s]' % task_run.id)
 
         def on_done(*args):
             if self.tasks.get(task.id):
@@ -158,8 +161,9 @@ class TasksRunner:
 
 
 class Task:
-    def __init__(self, task_id=None):
+    def __init__(self, task_id=None, ttl=None):
         self.id = task_id or str(uuid4())
+        self.ttl = ttl
     
     def run(self, context=None):
         pass
@@ -183,8 +187,8 @@ class Task:
 
 
 class CodeTask(Task):
-    def __init__(self, task_id, code, exec_type, data=None):
-        super(CodeTask, self).__init__(task_id)
+    def __init__(self, task_id, code, exec_type, ttl=None, data=None):
+        super(CodeTask, self).__init__(task_id, ttl)
         self.code = code
         self.type = exec_type
         self.data = data
@@ -215,8 +219,8 @@ class CodeTask(Task):
 
 class FunctionBytecodeTask(CodeTask):
     
-    def __init__(self, task_id, bytecode, fn_args, fn_kwargs, data):
-        super(FunctionBytecodeTask, self).__init__(task_id, code=bytecode, data=data, exec_type="FunctionBytecode")
+    def __init__(self, task_id, bytecode, fn_args, fn_kwargs, data, ttl=None):
+        super(FunctionBytecodeTask, self).__init__(task_id, code=bytecode, data=data, exec_type="FunctionBytecode", ttl=ttl)
         self.fn_args = fn_args
         self.function = None
         
@@ -235,7 +239,7 @@ class ProcessTaskException(TaskException):
 
 class LocalProcessTask(Task):
 
-    def __LocalProcessBuilder(self, id, data):
+    def __LocalProcessBuilder(id, data):
 
         executable = data['executable']
         args = data['args']
@@ -245,7 +249,7 @@ class LocalProcessTask(Task):
 
         return process
 
-    def __SSHProcessBuilder(self, id, data):
+    def __SSHProcessBuilder(id, data):
         executable = data['executable']
         host = data['host']
         port = data.get('port', '22')
@@ -266,8 +270,8 @@ class LocalProcessTask(Task):
         'SSHProcess': __SSHProcessBuilder
     }
 
-    def __init__(self, process_type, process_data, task_id=None):
-        super(LocalProcessTask, self).__init__(task_id=task_id)
+    def __init__(self, process_type, process_data, task_id=None, ttl=None):
+        super(LocalProcessTask, self).__init__(task_id=task_id, ttl=ttl)
         self.process = None
         self.__build_process(process_type, process_data)
 
@@ -281,7 +285,10 @@ class LocalProcessTask(Task):
             raise ProcessTaskException('Failed to build process of type %s' % process_type) from e
 
     def run(self, context=None):
+        print('Executing process %s' % self.process)
         self.process.execute()
+        print('Process started. Waiting...')
+        self.process.wait()
 
     def stop(self, reason=None):
         self.process.kill()
@@ -293,10 +300,11 @@ def __local_process_task_from_message(msg):
         raise ProcessTaskException('No process type specified')
     process_data = msg.data['process']
     task_id = msg.headers.get('task-id') or str(uuid4())
-    return LocalProcessTask(process_type=process_type, process_data=process_data, task_id=task_id)
+    ttl = int(msg.headers.get('ttl') or 0)
+    return LocalProcessTask(process_type=process_type, process_data=process_data, task_id=task_id, ttl=ttl)
 
 __TASK_BUILDERS = {
-    'local-process': __local_process_task_from_message
+    'process': __local_process_task_from_message
 }
 
 
