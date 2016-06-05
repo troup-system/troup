@@ -116,12 +116,26 @@ class Node:
     def __register_commands(self):
         self.command_handler('apps', self.__list_apps)
         self.command_handler('info', self.__get_info)
+        self.command_handler('task-result', self.__task_result)
 
     def __list_apps(self, command):
         return self.get_available_apps()
 
     def __get_info(self, command):
         return self.get_node_info()
+
+    def __task_result(self, command):
+        stats = self.runner.stats
+        task_id = command.data['task-id']
+        status = stats.get(task_id)
+        if not status:
+            print('Tasks: %s' % self.runner.tasks)
+            raise Exception('No such task')
+        if status['status'] is not 'DONE':
+            raise Exception('Task status %s' % status['status'])
+        run = self.runner.tasks[task_id]
+        print('Task result: [%s]' % run.task.result)
+        return run.task.result
 
     def command_handler(self, command, handler):
         self.commands[command] = handler
@@ -135,7 +149,7 @@ class Node:
             reply = handler(command)
             self.__reply(command, reply=reply, channel=channel)
         except Exception as e:
-            self.__reply(command, reply=e.message, error=True, channel=channel)
+            self.__reply(command, reply=str(e), error=True, channel=channel)
             logging.exception('Failed to execute command %s', command)
 
     def __reply(self, msg, reply, channel, error=None):

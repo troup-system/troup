@@ -46,6 +46,7 @@ class TaskRun:
             if self.status is TaskRun.RUNNING:
                 self.stop()
         except Exception as e:
+            logging.exception('Failed to execute task')
             self.status = TaskRun.ERROR
             self.error = e
 
@@ -57,6 +58,7 @@ class TaskRun:
             self.do_stop(reason)
             self.status = TaskRun.DONE
         except Exception as e:
+            logging.exception('Failed to stop task')
             self.error = e
             self.status = TaskRun.ERROR
 
@@ -76,9 +78,12 @@ class TasksRunner:
         self.checker.start()
 
     def _check_tasks(self):
+        to_remove = []
         for id, task_run in self.tasks.items():
             if task_run.status is TaskRun.DONE or task_run.status is TaskRun.ERROR:
-                self.__remove_task(task_run)
+                to_remove.append(task_run)
+        for task_run in to_remove:
+            self.__remove_task(task_run)
 
     def run(self, task):
         if self.tasks.get(task.id):
@@ -96,7 +101,8 @@ class TasksRunner:
             if self.tasks.get(task.id):
                 run = self.tasks[task.id]
                 run.result = run.future.result()
-                del self.tasks[task.id]
+                if not run.ttl:
+                    del self.tasks[task.id]
 
         try:
             future = self.executor.submit(start_task)
@@ -152,7 +158,7 @@ class TasksRunner:
             'total': len(self.tasks)
         }
         running = 0
-        for id, run in self.tasks:
+        for id, run in self.tasks.items():
             result[id] = {
                 'id': id,
                 'status': run.status,
@@ -168,6 +174,7 @@ class Task:
     def __init__(self, task_id=None, ttl=None):
         self.id = task_id or str(uuid4())
         self.ttl = ttl
+        self.result = None
     
     def run(self, context=None):
         pass
@@ -196,7 +203,6 @@ class CodeTask(Task):
         self.code = code
         self.type = exec_type
         self.data = data
-        self.result = None
         
     def run(self, context):
         if not context.get('locals'):
@@ -338,14 +344,23 @@ class LocalProcessTask(Task):
         try:
             if returncode:
                 msg = self._handle_error(returncode)
+            else:
+                self.result = self._collect_result()
+                print('[[RESULT]]: ', self.result)
         finally:
             self.process.close_streams()
 
+    def _collect_result(self):
+        result = ''
+        print('Track process out -> ', self.consume_process_out)
+        if self.consume_process_out:
+            result += reduce(lambda a, b: a + str(b, 'utf-8'), self._out_buffer, '')
+        return result
 
     def _handle_error(self, returncode):
         message = 'code: %d' % returncode
         if self.consume_process_out:
-            err_msg = reduce(lambda a, b: a+b, self._err_buffer, '')
+            err_msg = reduce(lambda a, b: a + str(b, 'utf-8'), self._err_buffer, '')
             message += err_msg
 
         raise ProcessTaskException(message)
