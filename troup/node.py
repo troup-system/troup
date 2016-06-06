@@ -280,7 +280,7 @@ class SyncManager:
             self._on_sync_message_(msg)
 
     def _on_sync_message_(self, msg):
-        #print('Got sync message -> %s' % msg)
+        print('Got sync message -> %s' % msg)
         #print(' : From node %s(%s)' % (msg.data['node']['name'], msg.data['node']['endpoint']))
         nodes = [node_info_from_dict(msg.data['node'])]
 
@@ -352,7 +352,7 @@ class SyncManager:
     def get_sync_message(self):
         return message().value('node', self.node.get_node_info()).\
             value('known_nodes', [n for k,n in self.known_nodes.items()]).\
-            value('type', 'sync-message').build()
+            header('type', 'sync-message').build()
 
 
 
