@@ -19,6 +19,9 @@ class Node:
 
     def __init__(self, node_id, config):
         self.node_id = node_id
+
+        self.log = logging.getLogger('Node(%s)' % self.node_id)
+
         self.config = config
         self.store = self._build_store_()
         self.channel_manager = None
@@ -43,21 +46,21 @@ class Node:
     def __check_lock(self):
         lock = check_local_node_lock()
         if lock and lock.pid != self.pid:
-            raise Exception('Seems there is a node already running. PID is %d. ' +
+            raise Exception(('Seems there is a node already running. PID is %d. ' +
                             'If no node with this pid is running, then you may ' +
-                            'have to delete the file manually.' % lock.pid)
+                            'have to delete the file manually.') % lock.pid)
 
     def _start_channel_manager_(self):
         aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
         def start_aio_server():
-            print('AIO Server start')
+            self.log.debug('AIO Server start')
             aio_srv.start()
-            print('AIO Server end')
+            self.log.debug('AIO Server end')
         th = threading.Thread(target=start_aio_server)
         th.start()
-        print('Notify aio server to start')
         channel_manager = ChannelManager(aio_srv)
         self.aio_server = aio_srv
+        self.log.debug('AIO Server set up')
         return channel_manager
 
     def __register_message_dispatcher__(self):
@@ -70,6 +73,7 @@ class Node:
                     self.bus.publish('__message.genericType', msg, channel)
             except Exception as e:
                 self.log.exception('Failed to handle channel data', e)
+                self.lock.debug('Message ', message_str)
         self.channel_manager.on('channel.data', on_channel_data)
 
     def _build_store_(self):
@@ -78,7 +82,7 @@ class Node:
 
     def _start_stats_tracker_(self):
         self.stats_tracker = StatsTracker(period=self.config['stats']['update_interval'])
-        print('stats tracking ON')
+        self.log.info('stats tracking ON')
 
     def _start_sync_manager_(self):
         self.sync_manager = SyncManager(node=self, channel_manager=self.channel_manager, event_processor=None, sync_interval=10000, sync_percent=0.3)
@@ -90,7 +94,7 @@ class Node:
                 name, sep, endpoint = url.partition(':')
                 node = NodeInfo(name=name, stats=None, apps=None, endpoint=endpoint)
                 self.sync_manager.register_node(node)
-                print('Added neighbour %s [%s]' % (name, endpoint))
+                self.log.debug('Added neighbour %s [%s]' % (name, endpoint))
 
     def __register_to_local(self):
         if self.config.get('lock'):
@@ -105,12 +109,12 @@ class Node:
                 # FIXME: Add context to runner.
                 self.__reply(task, run.id, inc_channel)
             except Exception as e:
-                logging.exception('Failed to run task %s', task)
+                self.log.exception('Failed to run task %s', task)
                 self.__reply(task, str(e), inc_channel, error=True)
 
         @bus.subscribe('command')
         def __on_command__(command, inc_channel):
-            print('Received command: %s over channel %s' % (command, inc_channel))
+            self.log.debug('Received command: %s over channel %s' % (command, inc_channel))
             self.__process_command(command, inc_channel)
 
     def __register_commands(self):
@@ -129,12 +133,11 @@ class Node:
         task_id = command.data['task-id']
         status = stats.get(task_id)
         if not status:
-            print('Tasks: %s' % self.runner.tasks)
             raise Exception('No such task')
         if status['status'] is not 'DONE':
             raise Exception('Task status %s' % status['status'])
         run = self.runner.tasks[task_id]
-        print('Task result: [%s]' % run.task.result)
+        self.log.debug('Task result: [%s]' % run.task.result)
         return run.task.result
 
     def command_handler(self, command, handler):
@@ -158,7 +161,6 @@ class Node:
             value('error', error).value('reply', reply).build()
         ser_msg = serialize(reply_msg)
         channel.send(ser_msg)
-        print('Replied -> %s' % ser_msg)
 
     def get_available_apps(self):
         return [app.name for app in self.store.apps]
@@ -179,7 +181,7 @@ class Node:
         if self.config.get('lock'):
             self.__lock()
         self.channel_manager = self._start_channel_manager_()
-        print('Node %s started' % self.node_id)
+        self.log.info('Node %s started' % self.node_id)
         self._start_stats_tracker_()
         self._start_sync_manager_()
         self.__register_message_dispatcher__()
@@ -187,19 +189,19 @@ class Node:
         self.__register_command_handlers()
 
     def stop(self):
-        print('node stop')
+        self.log.debug('node stop')
         if self.stats_tracker:
             self.stats_tracker.stop_tracking()
-            print('Statistics tracking has stopped')
+            self.log.info('Statistics tracking has stopped')
         if self.aio_server:
             self.aio_server.stop()
-            print('Async I/O Server notified to stop')
+            self.log.info('Async I/O Server notified to stop')
         if self.sync_manager:
             self.sync_manager.stop()
         if self.lock:
             self.lock.unlock()
         self.runner.shutdown()
-        print('Runner stopped')
+        self.log.debug('Runner stopped')
 
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
@@ -278,14 +280,14 @@ class SyncManager:
                 continue
             if not self.known_nodes.get(node.name):
                 self.known_nodes[node.name] = node
-                print('Node %s has joined' % node.name)
+                logging.debug('Node %s has joined' % node.name)
                 self._print_known_nodes_()
             self._merge_node_(node)
 
     def _print_known_nodes_(self):
-        print(' Members: ')
+        logging.debug(' Members: ')
         for name, node in self.known_nodes.items():
-            print('   %s[%s]' % (name, node.endpoint))
+            logging.debug('   %s[%s]' % (name, node.endpoint))
 
     def _merge_node_(self, node):
         existing = self.known_nodes[node.name]
@@ -327,7 +329,7 @@ class SyncManager:
         for name in nodes:
             if self.known_nodes.get(name):
                 node = self.known_nodes[name]
-                print('Sync with %s [%s]' % (name, node.endpoint))
+                logging.debug('Sync with %s [%s]' % (name, node.endpoint))
                 self.channel_manager.send(to_url=node.endpoint, data=serialize(self.get_sync_message(), indent=2))
 
     def sync_one_node(self, node, this_node_info):

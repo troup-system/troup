@@ -4,7 +4,7 @@ from troup.threading import IntervalTimer
 from troup.node import read_local_node_lock
 from troup.messaging import message, serialize, deserialize, Message
 
-from threading import  Thread
+from threading import Thread
 from datetime import datetime, timedelta
 
 
