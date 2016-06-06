@@ -22,7 +22,7 @@ setup(
 
     author='Pavle Jonoski',
     author_email='jonoski.pavle@gmail.com',
-    license='Apache2',
+    license='http://www.apache.org/licenses/LICENSE-2.0',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
