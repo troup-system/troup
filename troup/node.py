@@ -65,11 +65,15 @@ class Node:
                             'have to delete the file manually.') % lock.pid)
 
     def _start_channel_manager_(self):
-        aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'), port=self.config['server']['port'], web_socket_class=IncomingChannelWSAdapter)
+        aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'),
+                                         port=self.config['server']['port'],
+                                         web_socket_class=IncomingChannelWSAdapter)
+
         def start_aio_server():
             self.log.debug('AIO Server start')
             aio_srv.start()
             self.log.debug('AIO Server end')
+
         th = threading.Thread(target=start_aio_server)
         th.start()
         channel_manager = ChannelManager(aio_srv)
@@ -99,7 +103,8 @@ class Node:
         self.log.info('stats tracking ON')
 
     def _start_sync_manager_(self):
-        self.sync_manager = SyncManager(node=self, channel_manager=self.channel_manager, event_processor=None, sync_interval=10000, sync_percent=0.3)
+        self.sync_manager = SyncManager(node=self, channel_manager=self.channel_manager,
+                                        event_processor=None, sync_interval=10000, sync_percent=0.3)
         self.sync_manager.start()
 
         neighbours = self.config.get('neighbours')
@@ -218,7 +223,8 @@ class Node:
         self.log.debug('Runner stopped')
 
     def get_node_info(self):
-        return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(), apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
+        return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(),
+                        apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
 
 
 class NodeInfo:
@@ -267,7 +273,7 @@ class SyncManager:
     def __init__(self, node, channel_manager, event_processor, sync_interval=60000, sync_percent=0.3):
         self.node = node
         self.channel_manager = channel_manager
-        self.event_processor= event_processor
+        self.event_processor = event_processor
         self.sync_percent = sync_percent
         self.known_nodes = {}
         self.random_buffer = RandomBuffer(self.known_nodes)
@@ -280,7 +286,7 @@ class SyncManager:
             self._on_sync_message_(msg)
 
     def _on_sync_message_(self, msg):
-        print('Got sync message -> %s' % msg)
+        #print('Got sync message -> %s' % msg)
         #print(' : From node %s(%s)' % (msg.data['node']['name'], msg.data['node']['endpoint']))
         nodes = [node_info_from_dict(msg.data['node'])]
 
@@ -294,7 +300,7 @@ class SyncManager:
                 continue
             if not self.known_nodes.get(node.name):
                 self.known_nodes[node.name] = node
-                logging.debug('Node %s has joined' % node.name)
+                logging.info('Node %s has joined' % node.name)
                 self._print_known_nodes_()
             self._merge_node_(node)
 
@@ -317,6 +323,7 @@ class SyncManager:
 
         for name in to_remove:
             del self.known_nodes[name]
+            logging.info('Node %s has probably left' % name)
 
     def start(self):
         self.sync_timer.start()
@@ -351,9 +358,8 @@ class SyncManager:
 
     def get_sync_message(self):
         return message().value('node', self.node.get_node_info()).\
-            value('known_nodes', [n for k,n in self.known_nodes.items()]).\
+            value('known_nodes', [n for k, n in self.known_nodes.items()]).\
             header('type', 'sync-message').build()
-
 
 
 NODE_LOCK_FILE_PATH = '/tmp/troup.node.lock'
@@ -362,8 +368,10 @@ NODE_LOCK_FILE_PATH = '/tmp/troup.node.lock'
 def local_node_lock_file(node_info=None):
     return this_process_info_file(NODE_LOCK_FILE_PATH, info=node_info, create=True)
 
+
 def check_local_node_lock():
     return open_process_lock_file(NODE_LOCK_FILE_PATH)
+
 
 def read_local_node_lock():
     return open_process_lock_file(NODE_LOCK_FILE_PATH, read_only=True)

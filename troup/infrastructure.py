@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-
 __author__ = 'pavle'
 
 from types import FunctionType
@@ -24,6 +22,10 @@ from queue import Queue
 
 
 class ChannelError(Exception):
+    pass
+
+
+class ChannelClosedError(ChannelError):
     pass
 
 
@@ -51,9 +53,12 @@ class Channel:
             self.status = Channel.CONNECTING
             self.connect()
             self.status = Channel.OPEN
+        except ChannelError:
+            self.status = Channel.ERROR
+            raise
         except Exception as e:
             self.status = Channel.ERROR
-            raise ChannelError(e)
+            raise ChannelError() from e
 
     def close(self):
         if self.status is not Channel.OPEN:
@@ -62,9 +67,12 @@ class Channel:
             self.status = Channel.CLOSING
             self.disconnect()
             self.status = Channel.CLOSED
+        except ChannelError:
+            self.status = Channel.ERROR
+            raise
         except Exception as e:
             self.status = Channel.ERROR
-            raise ChannelError(e)
+            raise ChannelError() from e
 
     def connect(self):
         pass
@@ -310,11 +318,11 @@ class OutgoingChannelOverWS(Channel):
     def __init__(self, name, to_url, early_messages='queue', queue_max_size=1000):
         super(OutgoingChannelOverWS, self).__init__(name, to_url)
         self.web_socket = OutgoingChannelWSAdapter(url=to_url,
-           handlers={
-                'opened': self._on_open_handler_,
-                'closed': self._on_closed_handler_,
-                'on_data': self.data_received
-           })
+                                                   handlers={
+                                                       'opened': self._on_open_handler_,
+                                                       'closed': self._on_closed_handler_,
+                                                       'on_data': self.data_received
+                                                   })
         self._early_messages = early_messages
         self._queue_max_size = queue_max_size
         self.queue = None
@@ -341,24 +349,32 @@ class OutgoingChannelOverWS(Channel):
 
     def _on_closed_handler_(self, code, reason=None):
         self.trigger('closed', self, code, reason)
+        self.status = Channel.CLOSING
         self.on_closed(code, reason)
+        self.status = Channel.CLOSED
 
     def on_closed(self, code, reason=None):
         pass
 
     def connect(self):
-        self.web_socket.connect()
+        try:
+            self.web_socket.connect()
+        except (ConnectionRefusedError, ConnectionAbortedError, ConnectionResetError) as e:
+            raise ChannelClosedError() from e
 
     def disconnect(self):
         self.web_socket.close()
 
     def send(self, data):
         if self.status == Channel.OPEN:
-            self.web_socket.send(payload=data)
+            try:
+                self.web_socket.send(payload=data)
+            except (ConnectionRefusedError, ConnectionAbortedError, ConnectionResetError) as e:
+                raise ChannelClosedError() from e
         elif self.status in [Channel.CREATED, Channel.CONNECTING]:
             self.__send_early(data)
         else:
-            raise Exception('Cannot send: invalid channel status')
+            raise ChannelClosedError('Cannot send: invalid channel status')
     
     def __send_early(self, data):
         if self._early_messages == 'queue':
@@ -366,7 +382,8 @@ class OutgoingChannelOverWS(Channel):
         elif self._early_messages == 'reject':
             raise Exception('Early message rejected')
         else:
-            logging.warn('Early message [%s] not send due to unknow early messages strategy: %s' % (str(data), self._early_messages))
+            logging.warn('Early message [%s] not send due to unknown early messages strategy: %s' %
+                         (str(data), self._early_messages))
             
 
 class ChannelManager(Observable):
@@ -405,7 +422,11 @@ class ChannelManager(Observable):
     def open_channel_to(self, name, url):
         och = OutgoingChannelOverWS(name=name, to_url=url)
         self._on_open_channel_(och)
-        och.open()
+        try:
+            och.open()
+        except ChannelClosedError:
+            self.trigger('channel.closed', och)
+            raise
         return och
 
     def close_channel(self, name=None, endpoint=None):
@@ -414,9 +435,9 @@ class ChannelManager(Observable):
     def _on_open_channel_(self, channel):
         channel.on('closed', self._handle_closed_channel_)
 
-        def get_data_listener(channel):
+        def get_data_listener(chn):
             def data_listener(data):
-                self.trigger('channel.data', data, channel)
+                self.trigger('channel.data', data, chn)
             return data_listener
 
         channel.register_listener(get_data_listener(channel))
@@ -425,8 +446,8 @@ class ChannelManager(Observable):
 
     def _handle_closed_channel_(self, channel, code, reason=None):
         del self.channels[channel.name]
-        del self.by_url[channel.endpoint]
-        self.trigger('channel.close', channel)
+        del self.by_url[channel.to_url]
+        self.trigger('channel.closed', channel)
 
     def listen(self, name=None, to_url=None, listener=None):
         channel = self.channel(name, to_url)
@@ -434,10 +455,14 @@ class ChannelManager(Observable):
 
     def send(self, name=None, to_url=None, data=None):
         channel = self.channel(name, to_url)
-        channel.send(data)
+        try:
+            channel.send(data)
+        except ChannelClosedError as e:
+            channel.close()
+            self._handle_closed_channel_(channel, 1006, str(e))
 
     def on_data(self, callback, from_channel=None):
-        def actual_callback_no_filter(data, channel):
+        def actual_callback_no_filter(data, chn):
             callback(data)
 
         def actual_callback_with_filter(data, channel):
@@ -519,8 +544,8 @@ class MessageBus:
             subscribers.remove(handler)
 
 
-
 message_bus = MessageBus()
+
 
 class Subscribe:
     def __init__(self, topic, filter=None, bus=None):
