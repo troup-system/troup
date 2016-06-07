@@ -51,7 +51,7 @@ setup(
     # this:
     #   py_modules=["my_module"],
 
-    install_requires=['ws4py', 'psutil'],
+    install_requires=['ws4py', 'psutil', 'nose'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

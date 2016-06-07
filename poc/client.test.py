@@ -2,9 +2,11 @@ import sys
 
 sys.path.append('..')
 
-from troup.client import CommandAPI, client_to_local_node
+from troup.client import CommandAPI, client_to_local_node, ChannelClient
 
-cmd = CommandAPI(channel_client=client_to_local_node())
+cc = ChannelClient(nodes_specs=['RPI:ws://192.168.2.128:7000'])
+
+cmd = CommandAPI(channel_client=cc)
 
 promise = cmd.send(CommandAPI.command('info', {}))
 print(promise)

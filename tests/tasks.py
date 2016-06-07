@@ -1,7 +1,7 @@
 import unittest
 import sys
 
-sys.path.append('/..')
+sys.path.append('..')
 
 import time
 from troup.tasks import Task, TaskRun, TasksRunner
