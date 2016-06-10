@@ -23,6 +23,10 @@ Requirements
 * psutil
 * ws4py
 
+Get started
+===========
+
+Check out the the [Getting Started](https://github.com/troup-system/troup/wiki/GettingStarted) guide on the wiki.
 
 Documentation
 =============
