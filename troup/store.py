@@ -113,10 +113,7 @@ class InMemorySyncedStore(Store):
         self.settings = self.__load__settings__()
 
     def ___store_apps___(self):
-        def default_enc(obj):
-            return json.dumps(obj.__dict__)
-
-        apps_json = json.dumps(self.apps, default=default_enc)
+        apps_json = json.dumps(self.apps, cls=DictEncoder)
         self.__store__(self.apps_file, apps_json)
 
     def __store_settings__(self):
@@ -164,3 +161,9 @@ class InMemorySyncedStore(Store):
     def set_setting(self, name, value):
         self.settings[name] = value
         self.__store_settings__()
+
+
+class DictEncoder(json.JSONEncoder):
+    
+    def default(self, o):
+        return o.__dict__
