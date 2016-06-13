@@ -17,9 +17,9 @@ __author__ = 'pavle'
 
 class App:
 
-    def __init__(self, name, description, command, tunnel_audio=False, tunnel_video=False):
+    def __init__(self, name, description, command, params=None, needs=None):
         self.name = name
         self.description = description
         self.command = command
-        self.tunnel_audio = tunnel_audio
-        self.tunnel_video = tunnel_video
+        self.params = params or {}
+        self.needs = needs or { "cpu": 0, "memory": 0, "network": 0, "disk": 0 }

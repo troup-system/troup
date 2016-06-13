@@ -180,15 +180,35 @@ class Node:
             value('error', error).value('reply', reply).build()
         ser_msg = serialize(reply_msg)
         channel.send(ser_msg)
-
+    
+    def _merge_apps(apps, napps, node):
+        for napp in napps:
+            app = apps.get(napp.name)
+            if not app:
+                app = {
+                    'name': napp.name,
+                    'description': napp.description,
+                    'command': napp.command,
+                    'params': napp.params,
+                    'needs': {}
+                }
+                apps[napp.name] = app
+            app['needs'][node] = napp.needs
+    
     def get_available_apps(self):
-        return [app.name for app in self.store.apps]
-
+        apps = {}
+        Node._merge_apps(apps, self.get_apps(), self.node_id)
+        
+        for node_name, node_info in self.sync_manager.known_nodes.items():
+            if node_name is not self.node_id:
+                Node._merge_apps(apps, node_info.apps, node_name)
+        return apps
+        
     def get_stats(self):
         pass
 
     def get_apps(self):
-        pass
+        return [app for name, app in self.store.apps.items()]
 
     def query(self, q):
         pass

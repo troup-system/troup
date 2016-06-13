@@ -80,13 +80,16 @@ class InMemorySyncedStore(Store):
 
     def __load_apps__(self):
         apps = {}
-        apps_json = json.loads(self.__load__(self.__to_path__(self.apps_file)))
+        apps_str = self.__load__(self.__to_path__(self.apps_file))
+        apps_json = json.loads(apps_str)
         for app_id, app_json in apps_json.items():
             apps[app_id] = self.__get_app__(app_json)
         return apps
 
     def __get_app__(self, app_json):
-        return App(app_json['name'], app_json.get('description'), app_json['command'])
+        return App(name=app_json['name'], description=app_json.get('description'),\
+            command=app_json['command'], params=app_json.get('params'),\
+            needs=app_json.get('needs'))
 
     def __load__settings__(self):
         return json.loads(self.__load__(self.__to_path__(self.apps_file)))
