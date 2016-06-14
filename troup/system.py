@@ -17,6 +17,7 @@ __author__ = 'pavle'
 import psutil
 import os
 import platform
+import re
 
 from troup.threading import IntervalTimer
 
@@ -66,6 +67,7 @@ class StatsTracker:
         self.platform = platform.system()
         self.periodic_update = IntervalTimer(interval=self.period, target=self.refresh_values)
         self.periodic_update.start()
+        self.bogomips = get_bogomips()
     
     def refresh_values(self):
         cpu_usage = psutil.cpu_percent(percpu=True)
@@ -93,7 +95,7 @@ class StatsTracker:
             'usage': self.cpu_usage_avg,
             'per_cpu': self.cpu_usage,
             'processors': self.cpu_count,
-            'bogomips': 0.0 # FIXME: read from proc
+            'bogomips': self.bogomips
         }
         return stats
     
@@ -117,6 +119,57 @@ class StatsTracker:
         self.periodic_update.cancel()
 
 
+
+class CpuinfoParser:
+    
+    ENTRY_REGEX = '(?P<label>[\w\d-]+)\s?:\s?(?P<value>.+)'
+    
+    def __init__(self):
+        self.processors = {}
+        
+        self._processor = None
+        self._features = {}
+        
+    def parse(self, cpu_info_file):
+        line = cpu_info_file.readline()
+        
+        while line:
+            line = line.strip()
+            if line:
+                self._parse_line(line)
+            line = cpu_info_file.readline()
+        return self.processors
+    
+    def _parse_line(self, line):
+        m = re.search(CpuinfoParser.ENTRY_REGEX, line)
+        if m:
+            label = m.group('label')
+            value = m.group('value')
+            if label == 'processor':
+                if not self._processor:
+                    self.processors[value] = self._features
+                else:
+                    self.processors[value] = self._features = {}
+            self._features[label] = value
+                
+                
+
+def get_bogomips():
+    bogomips = {
+        'total': 0,
+        'cpus': {}
+    }
+    with open('/proc/cpuinfo') as cpuinfo:
+        parser = CpuinfoParser()
+        processors = parser.parse(cpuinfo)
+        for processor, features in processors.items():
+            bmps = features.get('bogomips')
+            if bmps:
+                bmps = float(bmps)
+                bogomips['total'] += bmps
+                bogomips['cpus'][processor] = bmps
+    
+    return bogomips
 
 if __name__ == '__main__':
     import json

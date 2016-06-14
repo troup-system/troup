@@ -214,7 +214,17 @@ class Node:
         pass
 
     def run_app(self, app_name):
-        pass
+        # find app
+        # sort nodes by requirements
+        apps = self.get_available_apps()
+        
+        app = apps.get(app_name)
+        if not app:
+            raise Exception('No such app %s' % app_name)
+        
+    
+    def _find_bet_fit(self, app_needs, nodes_stats):
+        pass    
 
     def start(self):
         if self.config.get('lock'):
@@ -244,15 +254,17 @@ class Node:
 
     def get_node_info(self):
         return NodeInfo(name=self.node_id, stats=self.stats_tracker.get_stats(),
-                        apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint())
+                        apps=self.get_apps(), endpoint=self.aio_server.get_server_endpoint(),
+                        hostname=self.stats_tracker.hostname)
 
 
 class NodeInfo:
-    def __init__(self, name=None, stats=None, apps=None, endpoint=None):
+    def __init__(self, name=None, stats=None, apps=None, endpoint=None, hostname=None):
         self.name = name
         self.stats = stats
         self.apps = apps
         self.endpoint = endpoint
+        self.hostname = hostname
 
 
 def node_info_from_dict(node_dict):

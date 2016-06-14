@@ -1,0 +1,1 @@
+{"test-app": {"params": {"p1": "v1", "p2": "v2"}, "description": "description", "name": "test-app", "needs": {"cpu": 0, "disk": 3, "network": 2, "memory": 1}, "command": "run test-app"}}

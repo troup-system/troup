@@ -4,7 +4,8 @@ sys.path.append('..')
 
 from troup.client import CommandAPI, client_to_local_node, ChannelClient
 
-cc = ChannelClient(nodes_specs=['RPI:ws://192.168.2.128:7000'])
+#cc = ChannelClient(nodes_specs=['RPI:ws://192.168.2.128:7000'])
+cc = client_to_local_node()
 
 cmd = CommandAPI(channel_client=cc)
 
