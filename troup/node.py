@@ -26,6 +26,7 @@ from troup.tasks import TasksRunner, build_task
 import random
 from math import ceil
 from os import getpid
+from functools import reduce
 import logging
 
 
@@ -190,10 +191,10 @@ class Node:
                     'description': napp.description,
                     'command': napp.command,
                     'params': napp.params,
-                    'needs': {}
+                    'needs': napp.needs
                 }
                 apps[napp.name] = app
-            app['needs'][node] = napp.needs
+            #app['needs'][node] = napp.needs
     
     def get_available_apps(self):
         apps = {}
@@ -223,8 +224,29 @@ class Node:
             raise Exception('No such app %s' % app_name)
         
     
-    def _find_bet_fit(self, app_needs, nodes_stats):
-        pass    
+    def _rank_nodes(app_needs, nodes_stats):
+        m = max([v for k,v in app_needs.items()])
+        W = {}
+        for k, v in app_needs.items():
+            W[k] = v/m
+        
+        return sorted([{'score': Node._calc_score(ns, W), 'stats': ns, 'node': node} for node, ns in nodes_stats.items()], key=lambda x: x['score'], reverse=True)
+        
+    def _calc_score(stats, W):
+        score = 0
+        # CPU score
+        score += Node._relevant_cpu_value(stats) * W['cpu']
+        score += stats['memory']['available'] * W['memory']
+        score += stats['disk']['ioload'] * (-W['disk'])
+        # FIXME: add network score
+        return score
+    
+    def _relevant_cpu_value(stats):
+        # available bogomips = total bogomips - cpu usage * total bogomips = total bogomips * (1 - cpu usage)
+        total_bogomips = stats['cpu']['bogomips']['total']
+        usage = stats['cpu']['usage']
+        return total_bogomips * (1 - usage)
+            
 
     def start(self):
         if self.config.get('lock'):
