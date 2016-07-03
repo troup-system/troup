@@ -18,7 +18,7 @@ setup(
     version='0.1.0',
     description='Troup system',
     long_description=long_description,
-    url='https://github.com/troup/troup',
+    url='https://github.com/troup-system/troup',
 
     author='Pavle Jonoski',
     author_email='jonoski.pavle@gmail.com',
