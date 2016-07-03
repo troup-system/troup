@@ -32,17 +32,18 @@ import logging
 
 class Node:
 
-    def __init__(self, node_id, config):
+    def __init__(self, node_id, config, store=None, channel_manager=None,\
+                 aio_server=None, stats_tracker=None, sync_manager=None):
         self.node_id = node_id
 
         self.log = logging.getLogger('Node(%s)' % self.node_id)
 
         self.config = config
-        self.store = self._build_store_()
-        self.channel_manager = None
-        self.aio_server = None
-        self.stats_tracker = None
-        self.sync_manager = None
+        self.store = store or self._build_store_()
+        self.channel_manager = channel_manager or None
+        self.aio_server = aio_server or None
+        self.stats_tracker = stats_tracker or None
+        self.sync_manager = sync_manager or None
         self.bus = message_bus
         self.lock = None
         self.pid = getpid()
@@ -66,7 +67,9 @@ class Node:
                             'have to delete the file manually.') % lock.pid)
 
     def _start_channel_manager_(self):
-        aio_srv = AsyncIOWebSocketServer(host=self.config['server'].get('hostname'),
+        if self.channel_manager is not None:
+            return
+        aio_srv = self.aio_server or AsyncIOWebSocketServer(host=self.config['server'].get('hostname'),
                                          port=self.config['server']['port'],
                                          web_socket_class=IncomingChannelWSAdapter)
 
@@ -100,11 +103,11 @@ class Node:
         return store
 
     def _start_stats_tracker_(self):
-        self.stats_tracker = StatsTracker(period=self.config['stats']['update_interval'])
+        self.stats_tracker = self.stats_tracker or StatsTracker(period=self.config['stats']['update_interval'])
         self.log.info('stats tracking ON')
 
     def _start_sync_manager_(self):
-        self.sync_manager = SyncManager(node=self, channel_manager=self.channel_manager,
+        self.sync_manager = self.sync_manager or SyncManager(node=self, channel_manager=self.channel_manager,
                                         event_processor=None, sync_interval=10000, sync_percent=0.3)
         self.sync_manager.start()
 
@@ -191,10 +194,11 @@ class Node:
                     'description': napp.description,
                     'command': napp.command,
                     'params': napp.params,
-                    'needs': napp.needs
+                    'needs': napp.needs,
+                    'nodes': []
                 }
                 apps[napp.name] = app
-            #app['needs'][node] = napp.needs
+            app['nodes'].append(node)
     
     def get_available_apps(self):
         apps = {}
@@ -202,7 +206,7 @@ class Node:
         
         for node_name, node_info in self.sync_manager.known_nodes.items():
             if node_name is not self.node_id:
-                Node._merge_apps(apps, node_info.apps, node_name)
+                Node._merge_apps(apps, node_info.apps, node_info)
         return apps
         
     def get_stats(self):
@@ -223,6 +227,8 @@ class Node:
         if not app:
             raise Exception('No such app %s' % app_name)
         
+        ranked = Node._rank_nodes(app['needs'], [n.stats for n in app['nodes']])
+        print('RANKED: %s' % ranked)
     
     def _rank_nodes(app_needs, nodes_stats):
         m = max([v for k,v in app_needs.items()])
