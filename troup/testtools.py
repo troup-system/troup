@@ -99,3 +99,8 @@ def dict_compare(given, expected):
         except Exception as e:
             raise Exception('Compare failed. Element for key [%s]: %s' % (key, str(e))) from e
 
+
+def load_json(file_path):
+    with open(file_path) as fl:
+        return json.loads(fl.read())
+
