@@ -59,14 +59,7 @@ class load_content:
         @wraps(method)
         def wrapper(*args, **kwargs):
             content = self._load_path()
-            nargs = None
-            if self.bound_method:
-                if len(args) > 1:
-                    nargs = (args[0], content, args[1:])
-                else:
-                    nargs = (args[0], content)
-            else:
-                nargs = (content, *args)
+            nargs = (*args, content)
             method(*nargs, **kwargs)
 
         return wrapper

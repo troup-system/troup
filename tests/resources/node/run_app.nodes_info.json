@@ -1,0 +1,98 @@
+{
+  "n1": {
+    "name": "n1",
+    "endpoint": "ws://n1",
+    "hostname": "device-1",
+    "stats": {
+        "disk": {
+          "ioload": 5
+        },
+        "memory": {
+          "available": 100
+        },
+        "cpu": {
+          "bogomips": 1000,
+          "usage": 0.1
+        }
+    },
+    "apps": [{
+        "params": {
+          "p1": "v1",
+          "p2": "v2"
+        },
+        "description": "description",
+        "name": "test-app",
+        "needs": {
+          "cpu": 500,
+          "disk": 10,
+          "network": 0.05,
+          "memory": 128
+        },
+        "command": "run test-app"
+    }]
+  },
+  "n2": {
+    "name": "n2",
+    "endpoint": "ws://n2",
+    "hostname": "device-2",
+    "stats":{
+        "disk": {
+          "ioload": 5
+        },
+        "memory": {
+          "available": 100
+        },
+        "cpu": {
+          "bogomips": 2000,
+          "usage": 0.2
+        }
+    },
+    "apps": [{
+        "params": {
+          "p1": "v1",
+          "p2": "v2"
+        },
+        "description": "description",
+        "name": "test-app",
+        "needs": {
+          "cpu": 500,
+          "disk": 10,
+          "network": 0.05,
+          "memory": 128
+        },
+        "command": "run test-app"
+    }]
+  },
+  "n3": {
+    "name": "n1",
+    "endpoint": "ws://n1",
+    "hostname": "device-1",
+    "stats": {
+        "disk": {
+          "ioload": 90
+        },
+        "memory": {
+          "available": 100
+        },
+        "cpu": {
+          "bogomips": 3000,
+          "usage": 0.9
+        }
+    },
+    "apps": [{
+        "params": {
+          "p1": "v1",
+          "p2": "v2"
+        },
+        "description": "description",
+        "name": "test-app",
+        "needs": {
+          "cpu": 500,
+          "disk": 10,
+          "network": 0.05,
+          "memory": 128
+        },
+        "command": "run test-app"
+    }]
+  }
+}

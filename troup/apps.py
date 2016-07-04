@@ -17,7 +17,7 @@ __author__ = 'pavle'
 
 class App:
 
-    def __init__(self, name, description, command, params=None, needs=None):
+    def __init__(self, name=None, description=None, command=None, params=None, needs=None):
         self.name = name
         self.description = description
         self.command = command

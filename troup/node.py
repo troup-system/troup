@@ -16,7 +16,7 @@ __author__ = 'pavle'
 
 from troup.store import InMemorySyncedStore
 from troup.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager, message_bus, bus
-from troup.system import StatsTracker
+from troup.system import StatsTracker, SystemStats
 from troup.messaging import message, serialize, deserialize, deserialize_dict, Message
 import threading
 from troup.threading import IntervalTimer
@@ -68,7 +68,7 @@ class Node:
 
     def _start_channel_manager_(self):
         if self.channel_manager is not None:
-            return
+            return self.channel_manager
         aio_srv = self.aio_server or AsyncIOWebSocketServer(host=self.config['server'].get('hostname'),
                                          port=self.config['server']['port'],
                                          web_socket_class=IncomingChannelWSAdapter)
@@ -184,7 +184,7 @@ class Node:
             value('error', error).value('reply', reply).build()
         ser_msg = serialize(reply_msg)
         channel.send(ser_msg)
-    
+
     def _merge_apps(apps, napps, node):
         for napp in napps:
             app = apps.get(napp.name)
@@ -199,16 +199,16 @@ class Node:
                 }
                 apps[napp.name] = app
             app['nodes'].append(node)
-    
+
     def get_available_apps(self):
         apps = {}
-        Node._merge_apps(apps, self.get_apps(), self.node_id)
-        
+        Node._merge_apps(apps, self.get_apps(), self.get_node_info())
+
         for node_name, node_info in self.sync_manager.known_nodes.items():
             if node_name is not self.node_id:
                 Node._merge_apps(apps, node_info.apps, node_info)
         return apps
-        
+
     def get_stats(self):
         pass
 
@@ -222,37 +222,37 @@ class Node:
         # find app
         # sort nodes by requirements
         apps = self.get_available_apps()
-        
+
         app = apps.get(app_name)
         if not app:
             raise Exception('No such app %s' % app_name)
-        
-        ranked = Node._rank_nodes(app['needs'], [n.stats for n in app['nodes']])
+
+        ranked = Node._rank_nodes(app['needs'], app['nodes'])
         print('RANKED: %s' % ranked)
-    
-    def _rank_nodes(app_needs, nodes_stats):
+
+    def _rank_nodes(app_needs, nodes_info):
         m = max([v for k,v in app_needs.items()])
         W = {}
         for k, v in app_needs.items():
             W[k] = v/m
-        
-        return sorted([{'score': Node._calc_score(ns, W), 'stats': ns, 'node': node} for node, ns in nodes_stats.items()], key=lambda x: x['score'], reverse=True)
-        
+
+        return sorted([{'score': Node._calc_score(node_info.stats, W), 'stats': node_info.stats, 'node': node_info.name} for node_info in nodes_info], key=lambda x: x['score'], reverse=True)
+
     def _calc_score(stats, W):
         score = 0
         # CPU score
         score += Node._relevant_cpu_value(stats) * W['cpu']
-        score += stats['memory']['available'] * W['memory']
-        score += stats['disk']['ioload'] * (-W['disk'])
+        score += stats.memory['available'] * W['memory']
+        score += stats.disk['ioload'] * (-W['disk'])
         # FIXME: add network score
         return score
-    
+
     def _relevant_cpu_value(stats):
         # available bogomips = total bogomips - cpu usage * total bogomips = total bogomips * (1 - cpu usage)
-        total_bogomips = stats['cpu']['bogomips']['total']
-        usage = stats['cpu']['usage']
+        total_bogomips = stats.cpu['bogomips']
+        usage = stats.cpu['usage']
         return total_bogomips * (1 - usage)
-            
+
 
     def start(self):
         if self.config.get('lock'):
@@ -302,8 +302,12 @@ def node_info_from_dict(node_dict):
     for dapp in dapps:
         app = deserialize_dict(dapp, App)
         apps.append(app)
+
+    dstats = node_dict.get('stats') or {}
+    stats = deserialize_dict(dstats, SystemStats)
     node = deserialize_dict(node_dict, NodeInfo)
     node.apps = apps
+    node.stats = stats
     return node
 
 

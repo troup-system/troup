@@ -1,0 +1,17 @@
+{
+  "test-app": {
+    "params": {
+      "p1": "v1",
+      "p2": "v2"
+    },
+    "description": "description",
+    "name": "test-app",
+    "needs": {
+      "cpu": 500,
+      "disk": 10,
+      "network": 0.05,
+      "memory": 128
+    },
+    "command": "run test-app"
+  }
+}
