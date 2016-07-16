@@ -22,7 +22,7 @@ import threading
 from troup.threading import IntervalTimer
 from troup.apps import App
 from troup.process import this_process_info_file, open_process_lock_file
-from troup.tasks import TasksRunner, build_task
+from troup.tasks import TasksRunner, build_task, task_for_app
 import random
 from math import ceil
 from os import getpid
@@ -229,6 +229,24 @@ class Node:
 
         ranked = Node._rank_nodes(app['needs'], app['nodes'])
         print('RANKED: %s' % ranked)
+        for ranked_node in ranked:
+            try:
+                return self._run_as_task(app, ranked[0])
+            except Exception as e:
+                logging.exception('Failed to run on node %s' % ranked_node)
+        raise Exception('Failed to run app %s'%app_name)
+
+    def _run_as_task(self, app, ranked_node):
+        remote = ranked_node['node'] != self.node_id
+        node = {'name': ranked_node['node']}
+
+        if remote:
+            node['host'] = ''
+            node['port'] = 22
+            node['ssh_user'] = ''
+
+        task = task_for_app(app=app, remote=remote, node=node)
+        return self.runner.run(task)
 
     def _rank_nodes(app_needs, nodes_info):
         m = max([v for k,v in app_needs.items()])
@@ -252,7 +270,6 @@ class Node:
         total_bogomips = stats.cpu['bogomips']
         usage = stats.cpu['usage']
         return total_bogomips * (1 - usage)
-
 
     def start(self):
         if self.config.get('lock'):

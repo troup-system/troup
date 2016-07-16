@@ -406,4 +406,25 @@ def build_task(msg):
     builder = __TASK_BUILDERS.get(task_type)
     if not builder:
         raise TaskException('Cannot build task of type %s' % task_type)
-    return  builder(msg)
+    return builder(msg)
+
+
+def task_for_app(app, remote=False, node=None, ttl=0, consume_output=False, buffer_size=1024*1024):
+    process_type = 'LocalProcess' if remote else 'SSHProcess'
+    process_data = {
+        'executable': app.command
+    }
+
+    if remote:
+        process_data.update({
+            'host': node['host'],
+            'port': node['port'],
+            'ssh_user': node['ssh_user']
+        })
+
+    process_data.update(app.params)
+
+    task = LocalProcessTask(process_type=process_type, process_data=process_data, task_id=str(uuid4()), ttl=ttl,
+                            consume_process_out=consume_output, buffer_size=buffer_size)
+    return task
+
