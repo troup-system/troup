@@ -1,8 +1,7 @@
 {
   "test-app": {
     "params": {
-      "p1": "v1",
-      "p2": "v2"
+      "args": ["--p1", "v1"]
     },
     "description": "description",
     "name": "test-app",
@@ -12,6 +11,6 @@
       "network": 0.05,
       "memory": 128
     },
-    "command": "run test-app"
+    "command": "run"
   }
 }
