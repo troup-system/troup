@@ -1,1 +1,1 @@
-{"test-app": {"command": "run test-app", "name": "test-app", "needs": {"disk": 3, "network": 2, "memory": 1, "cpu": 0}, "description": "description", "params": {"p1": "v1", "p2": "v2"}}}
+{"test-app": {"name": "test-app", "description": "description", "needs": {"network": 2, "cpu": 0, "disk": 3, "memory": 1}, "params": {"p2": "v2", "p1": "v1"}, "command": "run test-app"}}

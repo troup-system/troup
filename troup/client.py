@@ -142,7 +142,7 @@ class ChannelClient:
         chn = OutgoingChannelOverWS(node_name, reference)
 
         def on_data(data):
-            print('DATA %s' % data)
+            #print('DATA %s' % data)
             self.__on_channel_data(data, channel=chn)
 
         chn.register_listener(on_data)
@@ -183,3 +183,69 @@ class CommandAPI:
 
     def shutdown(self):
         self.channel_client.shutdown()
+
+
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    from json import loads, dumps
+
+    parser = ArgumentParser(prog="troup.client", description="Low level troup system client")
+
+    parser.add_argument('--node', help='Node connection URL.', default='ws://localhost:7000')
+    parser.add_argument('-t', '--type', default='command', help='Message type. May be "command" or "task".')
+    parser.add_argument('-d', '--data', help='Message data. This is usually a JSON string.')
+    parser.add_argument('-H', '--header', nargs='+', help='Message headers in the form HEADER_NAME=VALUE.')
+
+    parser.add_argument('--reply-timeout', default=5000, help='Message reply timeout in milliseconds.')
+    parser.add_argument('--check-interval', default=1000, help='Interval to check for timeouts in milliseconds.')
+
+    parser.add_argument('-c', '--command', help='The command name. Used only when type is "command".')
+
+    parser.add_argument('-v', '--verbose', help='Be more verbose.', action='store_true')
+
+    parser.add_argument('--as-json', action='store_true',
+                        help='Try to serialize the result as JSON and print it on stdout.')
+
+    args = parser.parse_args()
+
+    def printout(*arguments):
+        if args.verbose:
+            print(*arguments)
+
+    data = args.data or '{}'
+    data = loads(data)
+
+    mb = message(data=data)
+    for header in args.header or []:
+        try:
+            header_name, value = header.split('=')
+            mb.header(header, value)
+        except Exception as e:
+            raise Exception('Invalid header value %s' % header) from e
+
+    mb.header('type', args.type)
+
+    if args.type == 'command' and args.command:
+        mb.header('command', args.command)
+
+    try:
+        message = mb.build()
+
+        channel_client = ChannelClient(nodes_specs=['TARGET:%s'%args.node], reply_timeout=args.reply_timeout,
+                                       check_interval=args.check_interval)
+
+        api = CommandAPI(channel_client=channel_client)
+
+        printout('Sending to ', args.node)
+
+        promise = api.send(command=message, to_node='TARGET')
+
+        result = promise.result
+
+        if args.as_json:
+            print(dumps(result))
+        else:
+            print(result)
+    finally:
+        if api:
+            api.shutdown()

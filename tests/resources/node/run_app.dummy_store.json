@@ -11,6 +11,6 @@
       "network": 0.05,
       "memory": 128
     },
-    "command": "run"
+    "command": "./tests/resources/bin/testexec.sh"
   }
 }

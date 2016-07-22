@@ -144,6 +144,11 @@ class Node:
         self.command_handler('apps', self.__list_apps)
         self.command_handler('info', self.__get_info)
         self.command_handler('task-result', self.__task_result)
+        self.command_handler('run-app', self.__run_app)
+
+    def __run_app(self, command):
+        print('RUN APP COMMAND RECEIVED: %s' % command)
+        return 'ok'
 
     def __list_apps(self, command):
         return self.get_available_apps()
@@ -228,7 +233,6 @@ class Node:
             raise Exception('No such app %s' % app_name)
 
         ranked = Node._rank_nodes(app['needs'], app['nodes'])
-        print('RANKED: %s' % ranked)
         for ranked_node in ranked:
             try:
                 return self._run_as_task(app, ranked[0])
