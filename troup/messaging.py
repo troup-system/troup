@@ -61,7 +61,10 @@ def message(id=None, data=None):
 class DictEncoder(json.JSONEncoder):
     
     def default(self, o):
-        return o.__dict__
+        try:
+            return o.__dict__
+        except:
+            return None
 
 
 def serialize(msg, indent=None):

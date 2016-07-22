@@ -219,7 +219,7 @@ if __name__ == '__main__':
     for header in args.header or []:
         try:
             header_name, value = header.split('=')
-            mb.header(header, value)
+            mb.header(header_name, value)
         except Exception as e:
             raise Exception('Invalid header value %s' % header) from e
 

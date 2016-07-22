@@ -410,7 +410,7 @@ def build_task(msg):
 
 
 def task_for_app(app, remote=False, node=None, ttl=0, consume_output=False, buffer_size=1024*1024):
-    process_type = 'LocalProcess' if remote else 'SSHProcess'
+    process_type = 'SSHProcess' if remote else 'LocalProcess'
     process_data = {
         'executable': app['command']
     }
@@ -424,6 +424,9 @@ def task_for_app(app, remote=False, node=None, ttl=0, consume_output=False, buff
         })
 
     process_data.update(app['params'])
+
+    if not process_data.get('args'):
+        process_data['args'] = []
 
     task = LocalProcessTask(process_type=process_type, process_data=process_data, task_id=str(uuid4()), ttl=ttl,
                             consume_process_out=consume_output, buffer_size=buffer_size)

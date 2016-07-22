@@ -148,7 +148,8 @@ class Node:
 
     def __run_app(self, command):
         print('RUN APP COMMAND RECEIVED: %s' % command)
-        return 'ok'
+        print("RUN APP %s" % command.data['app'])
+        return self.run_app(app_name=command.data['app'])
 
     def __list_apps(self, command):
         return self.get_available_apps()
@@ -271,7 +272,7 @@ class Node:
 
     def _relevant_cpu_value(stats):
         # available bogomips = total bogomips - cpu usage * total bogomips = total bogomips * (1 - cpu usage)
-        total_bogomips = stats.cpu['bogomips']
+        total_bogomips = stats.cpu['bogomips']['total']
         usage = stats.cpu['usage']
         return total_bogomips * (1 - usage)
 
