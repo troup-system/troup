@@ -50,7 +50,7 @@ class SystemStats:
     """
 
     def __init__(self):
-        self.cpu = {'usage': 0.0, "per_cpu": [], 'processors': 0, 'bogomips': 0}
+        self.cpu = {'usage': 0.0, "per_cpu": [], 'processors': 0, 'bogomips': {'total': 0}}
         self.memory = {'total': 0, 'used': 0, 'available': 0}
         self.system = {'load': [0.0, 0.0, 0.0], 'name': '', 'platform': ''}
         self.disk = {'ioload': 0.0}

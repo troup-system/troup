@@ -68,7 +68,8 @@ class RunAppTest(unittest.TestCase):
 
 
         try:
-            node = Node(node_id='test-node', config={}, store=m_store, channel_manager=m_channel_manager, aio_server=m_aio_server, stats_tracker=m_stats_tracker, sync_manager=m_sync_manager)
+            node = Node(node_id='test-node', config={}, store=m_store, channel_manager=m_channel_manager,
+                        aio_server=m_aio_server, stats_tracker=m_stats_tracker, sync_manager=m_sync_manager)
             node.start()
             node.run_app('test-app')
         finally:

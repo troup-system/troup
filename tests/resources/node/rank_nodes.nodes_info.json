@@ -11,7 +11,9 @@
           "available": 100
         },
         "cpu": {
-          "bogomips": 1000,
+          "bogomips": {
+            "total": 1000
+          },
           "usage": 0.1
         }
     },
@@ -43,7 +45,9 @@
           "available": 100
         },
         "cpu": {
-          "bogomips": 2000,
+          "bogomips": {
+            "total": 2000
+          },
           "usage": 0.2
         }
     },
@@ -75,7 +79,9 @@
           "available": 100
         },
         "cpu": {
-          "bogomips": 3000,
+          "bogomips": {
+            "total": 3000
+          },
           "usage": 0.9
         }
     },
