@@ -32,8 +32,9 @@ import logging
 
 class Node:
 
-    def __init__(self, node_id, config, store=None, channel_manager=None,\
-                 aio_server=None, stats_tracker=None, sync_manager=None):
+    def __init__(self, node_id, config, store=None, channel_manager=None,
+                 aio_server=None, stats_tracker=None, sync_manager=None,
+                 tasks_runner=None):
         self.node_id = node_id
 
         self.log = logging.getLogger('Node(%s)' % self.node_id)
@@ -48,7 +49,7 @@ class Node:
         self.lock = None
         self.pid = getpid()
         self.commands = {}
-        self.runner = TasksRunner(max_workers=int(self.config.get('runner-max-workers', '3')))
+        self.runner = tasks_runner or TasksRunner(max_workers=int(self.config.get('runner-max-workers', '3')))
 
         self.__register_commands()
 
@@ -246,9 +247,10 @@ class Node:
         node = {'name': ranked_node['node']}
 
         if remote:
-            node['host'] = ''
-            node['port'] = 22
-            node['ssh_user'] = ''
+            node_info = self.sync_manager.get_node_info(ranked_node['node'])
+            node['host'] = node_info.hostname
+            node['port'] = node_info.data['ssh'].get('port') or 22
+            node['ssh_user'] = node_info.data['ssh'].get('user') or 'root'
 
         task = task_for_app(app=app, remote=remote, node=node)
         return self.runner.run(task)
@@ -309,12 +311,13 @@ class Node:
 
 
 class NodeInfo:
-    def __init__(self, name=None, stats=None, apps=None, endpoint=None, hostname=None):
+    def __init__(self, name=None, stats=None, apps=None, endpoint=None, hostname=None, data=None):
         self.name = name
         self.stats = stats
         self.apps = apps
         self.endpoint = endpoint
         self.hostname = hostname
+        self.data = data or {}
 
 
 def node_info_from_dict(node_dict):
@@ -446,6 +449,12 @@ class SyncManager:
         return message().value('node', self.node.get_node_info()).\
             value('known_nodes', [n for k, n in self.known_nodes.items()]).\
             header('type', 'sync-message').build()
+
+    def get_node_info(self, node):
+        node_info = self.known_nodes.get(node)
+        if not node_info:
+            raise Exception('Unknown node %s' % node)
+        return node_info
 
 
 NODE_LOCK_FILE_PATH = '/tmp/troup.node.lock'

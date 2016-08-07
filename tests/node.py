@@ -41,7 +41,11 @@ class RunAppTest(unittest.TestCase):
     @patch('troup.infrastructure.AsyncIOWebSocketServer')
     @patch('troup.infrastructure.ChannelManager')
     @patch('troup.store.Store')
-    def test_run_app(self, nodes_info, dummy_store_data, Store, ChannelManager, AsyncIOWebSocketServer, StatsTracker, SyncManager):
+    @patch('troup.tasks.TasksRunner')
+    def test_run_app(self, nodes_info, dummy_store_data, Store,
+                     ChannelManager, AsyncIOWebSocketServer,
+                     StatsTracker, SyncManager,
+                     TasksRunner):
         print('Nodes info -> %s' % nodes_info)
         print('Store data -> %s' % dummy_store_data)
         apps = {}
@@ -57,6 +61,7 @@ class RunAppTest(unittest.TestCase):
         m_aio_server = AsyncIOWebSocketServer()
         m_stats_tracker = StatsTracker()
         m_sync_manager = StatsTracker()
+        m_tasks_runner = TasksRunner()
 
         known_nodes = {}
         for node_id, node_dict in nodes_info.items():
@@ -69,7 +74,8 @@ class RunAppTest(unittest.TestCase):
 
         try:
             node = Node(node_id='test-node', config={}, store=m_store, channel_manager=m_channel_manager,
-                        aio_server=m_aio_server, stats_tracker=m_stats_tracker, sync_manager=m_sync_manager)
+                        aio_server=m_aio_server, stats_tracker=m_stats_tracker, sync_manager=m_sync_manager,
+                        tasks_runner=m_tasks_runner)
             node.start()
             node.run_app('test-app')
         finally:

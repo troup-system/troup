@@ -281,10 +281,11 @@ class LocalProcessTask(Task):
         forward_audio = data.get('forward_audio', False)
         compress_stream = data.get('compress_stream', False)
         ssh_user = data.get('ssh_user', '')
+        args = data.get('args', [])
 
         process = SSHRemoteProcess(id=id, name=executable, cwd=cwd, target_host=host, target_port=port,
                                    forward_video=forward_video, forward_audio=forward_audio,
-                                   compress_stream=compress_stream, ssh_user=ssh_user)
+                                   compress_stream=compress_stream, ssh_user=ssh_user, args=args)
 
         return process
 

@@ -3,6 +3,12 @@
     "name": "n1",
     "endpoint": "ws://n1",
     "hostname": "device-1",
+    "data":{
+        "ssh": {
+            "port": 22,
+            "user": "root"
+        }
+    },
     "stats": {
         "disk": {
           "ioload": 5
@@ -37,6 +43,12 @@
     "name": "n2",
     "endpoint": "ws://n2",
     "hostname": "device-2",
+    "data":{
+        "ssh": {
+            "port": 22,
+            "user": "root"
+        }
+    },
     "stats":{
         "disk": {
           "ioload": 5
@@ -71,6 +83,12 @@
     "name": "n1",
     "endpoint": "ws://n1",
     "hostname": "device-1",
+    "data":{
+        "ssh": {
+            "port": 22,
+            "user": "root"
+        }
+    },
     "stats": {
         "disk": {
           "ioload": 90
