@@ -52,7 +52,8 @@ def run_node():
     args = parser.parse_args()
     
     if args.version:
-        print('0.0.1')
+        from troup.metadata import __version__
+        print(__version__)
         return
         
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))

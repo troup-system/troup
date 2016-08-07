@@ -13,9 +13,11 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+from troup.metadata import __version__
+
 setup(
     name='troup',
-    version='0.1.0',
+    version=__version__,
     description='Troup system',
     long_description=long_description,
     url='https://github.com/troup-system/troup',
