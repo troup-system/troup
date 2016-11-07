@@ -71,7 +71,6 @@ class RunAppTest(unittest.TestCase):
 
         m_stats_tracker.get_stats.configure_mock(return_value=SystemStats())
 
-
         try:
             node = Node(node_id='test-node', config={}, store=m_store, channel_manager=m_channel_manager,
                         aio_server=m_aio_server, stats_tracker=m_stats_tracker, sync_manager=m_sync_manager,

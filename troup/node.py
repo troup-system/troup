@@ -15,7 +15,7 @@
 __author__ = 'pavle'
 
 from troup.store import InMemorySyncedStore
-from troup.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager, message_bus, bus
+from troup.infrastructure import AsyncIOWebSocketServer, IncomingChannelWSAdapter, ChannelManager, ChannelClosedError, message_bus, bus
 from troup.system import StatsTracker, SystemStats
 from troup.messaging import message, serialize, deserialize, deserialize_dict, Message
 import threading
@@ -31,7 +31,19 @@ import logging
 
 
 class Node:
-
+    """Basic interface for interaction with the system and the basic unit of the
+    system.
+    
+    A Node tracks system stats, interacts with other nodes and ultimatly manages
+    the execution of tasks and commands.
+    
+    The system is comprised of multiple nodes coordinating between themselves.
+    Usually there is one node per machine.
+    
+    * *node_id* is the node identifier. This should be uniqe on the system.
+    * *config* is the configuration :func:`dict` for the node.
+    * *store* is the :class:`troup.store.Store` instance used by this node.
+    """
     def __init__(self, node_id, config, store=None, channel_manager=None,
                  aio_server=None, stats_tracker=None, sync_manager=None,
                  tasks_runner=None):
@@ -63,7 +75,7 @@ class Node:
     def __check_lock(self):
         lock = check_local_node_lock()
         if lock and lock.pid != self.pid:
-            raise Exception(('Seems there is a node already running. PID is %d. ' +
+            raise Exception(('It seems there is a node already running. PID is %d. ' +
                             'If no node with this pid is running, then you may ' +
                             'have to delete the file manually.') % lock.pid)
 
@@ -440,7 +452,12 @@ class SyncManager:
             if self.known_nodes.get(name):
                 node = self.known_nodes[name]
                 logging.debug('Sync with %s [%s]' % (name, node.endpoint))
-                self.channel_manager.send(to_url=node.endpoint, data=serialize(self.get_sync_message(), indent=2))
+                try:
+                    self.channel_manager.send(to_url=node.endpoint, data=serialize(self.get_sync_message(), indent=2))
+                except ChannelClosedError as e:
+                    pass
+                except Exception as e:
+                  raise
 
     def sync_one_node(self, node, this_node_info):
         pass

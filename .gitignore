@@ -6,3 +6,4 @@ bin
 dist
 *.egg-info
 _build
+dev-env

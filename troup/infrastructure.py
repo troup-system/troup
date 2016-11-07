@@ -414,6 +414,7 @@ class ChannelManager(Observable):
             raise Exception('No channel URL specified')
         if not name and to_url:
             name = to_url
+        
         channel = self.open_channel_to(name, to_url)
         self.channels[name] = channel
         self.by_url[to_url] = channel
@@ -433,7 +434,7 @@ class ChannelManager(Observable):
         pass
 
     def _on_open_channel_(self, channel):
-        channel.on('closed', self._handle_closed_channel_)
+        channel.on('channel.closed', self._handle_closed_channel_)
 
         def get_data_listener(chn):
             def data_listener(data):
